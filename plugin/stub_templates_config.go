@@ -272,7 +272,7 @@ func (g *StubGenerator) getImportsForTemplate(templateName string, baseImports [
 			}
 		}
 
-		// Add io only for streaming methods in adapter/client
+		// Add io and log only for streaming methods in adapter/client
 		needsIO := false
 		for _, service := range g.services {
 			for _, method := range service.Methods {
@@ -287,8 +287,9 @@ func (g *StubGenerator) getImportsForTemplate(templateName string, baseImports [
 		}
 		if needsIO {
 			imports["io"] = true
+			imports["log"] = true
 			if g.ctx != nil && g.ctx.Logger != nil {
-				g.ctx.Logger.Debug(fmt.Sprintf("getImportsForTemplate(%s) - adding io for streaming", templateName))
+				g.ctx.Logger.Debug(fmt.Sprintf("getImportsForTemplate(%s) - adding io and log for streaming", templateName))
 			}
 		}
 	}
@@ -679,12 +680,18 @@ func (g *StubGenerator) getSliceFromProtoConversion(sliceType, protoFieldName st
 
 // getPointerToProtoConversion handles pointer type conversions
 func (g *StubGenerator) getPointerToProtoConversion(typeName, goFieldName string) string {
-	return fmt.Sprintf("ConvertPointerToProto_%s(orig.%s)", typeName, goFieldName)
+	// Clean the type name by removing pointer and slice prefixes for function naming
+	cleanTypeName := strings.TrimPrefix(typeName, "*")
+	cleanTypeName = strings.TrimPrefix(cleanTypeName, "[]")
+	return fmt.Sprintf("ConvertPointerToProto_%s(orig.%s)", cleanTypeName, goFieldName)
 }
 
 // getPointerFromProtoConversion handles pointer type conversions from proto
 func (g *StubGenerator) getPointerFromProtoConversion(typeName, protoFieldName string) string {
-	return fmt.Sprintf("ConvertPointerFromProto_%s(proto.%s)", typeName, protoFieldName)
+	// Clean the type name by removing pointer and slice prefixes for function naming
+	cleanTypeName := strings.TrimPrefix(typeName, "*")
+	cleanTypeName = strings.TrimPrefix(cleanTypeName, "[]")
+	return fmt.Sprintf("ConvertPointerFromProto_%s(proto.%s)", cleanTypeName, protoFieldName)
 }
 
 // isStructType checks if a type is a struct (not a primitive type)

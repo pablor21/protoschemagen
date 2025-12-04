@@ -66,8 +66,9 @@ func (c *{{$serviceName}}Client) {{.Name}}(ctx context.Context, req models.{{.In
 				break
 			}
 			if err != nil {
-				// TODO: Handle error better
-				break
+				// Log error and close channel gracefully
+				log.Printf("Error receiving from stream: %v", err)
+				return
 			}
 			resultChan <- {{.OutputType}}FromProto(resp)
 		}
@@ -134,8 +135,9 @@ func (c *{{$serviceName}}Client) {{.Name}}(ctx context.Context, inputChan chan m
 		for input := range inputChan {
 			protoReq := {{.InputType}}ToProto(input)
 			if err := stream.Send(protoReq); err != nil {
-				// TODO: Handle error better
-				break
+				// Log error and stop sending
+				log.Printf("Error sending to bidirectional stream: %v", err)
+				return
 			}
 		}
 	}()
@@ -149,8 +151,9 @@ func (c *{{$serviceName}}Client) {{.Name}}(ctx context.Context, inputChan chan m
 				break
 			}
 			if err != nil {
-				// TODO: Handle error better
-				break
+				// Log error and close channel gracefully
+				log.Printf("Error receiving from bidirectional stream: %v", err)
+				return
 			}
 			resultChan <- {{.OutputType}}FromProto(resp)
 		}

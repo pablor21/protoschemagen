@@ -684,10 +684,15 @@
         }
       ],
       "validOn": [
+        "file",
         "package",
-        "file"
+        "struct",
+        "enum",
+        "field"
       ],
-      "aliases": null,
+      "aliases": [
+        "imports"
+      ],
       "description": "Imports another proto file",
       "multiple": true,
       "globalUnique": false,

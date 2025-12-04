@@ -89,6 +89,11 @@ func (g *Generator) Generate() ([]byte, error) {
 		return nil, err
 	}
 
+	// Generate extensions
+	if err := g.generateExtensions(&out); err != nil {
+		return nil, err
+	}
+
 	// Generate services (if enabled)
 	if g.formatGen.config.GenerateService {
 		if err := g.generateServices(&out); err != nil {
@@ -100,6 +105,11 @@ func (g *Generator) Generate() ([]byte, error) {
 }
 
 func (g *Generator) getPackageName() string {
+	// First check for @proto.package annotation in file-level comments
+	if fileAnnotations := g.extractFileLevelPackageAnnotation(); fileAnnotations != "" {
+		return fileAnnotations
+	}
+
 	// Fall back to config
 	if g.formatGen.config.Package != "" {
 		return g.formatGen.config.Package
@@ -163,12 +173,99 @@ func (g *Generator) writeOptions(out *strings.Builder) error {
 }
 
 // extractFileLevelOptions extracts @proto.option annotations from file-level comments
-// Note: Currently returns empty map as file-level annotations are not yet fully implemented
-// Use the config.Options map instead for now
 func (g *Generator) extractFileLevelOptions() map[string]string {
 	options := make(map[string]string)
-	// TODO: Implement file-level @proto.option extraction when file AST is available in context
+
+	// Check file-level annotations that were extracted during parsing
+	if g.ctx != nil && g.ctx.FileAnnotations != nil {
+		for _, fileAnns := range g.ctx.FileAnnotations {
+			for _, ann := range fileAnns {
+				name := strings.ToLower(ann.Name)
+				if name == "option" || strings.HasSuffix(name, ".option") {
+					// Extract option key and value
+					if key, exists := ann.GetParamValue("name"); exists {
+						if value, exists := ann.GetParamValue("value"); exists {
+							options[key] = value
+						}
+					}
+				}
+			}
+		}
+	}
+
 	return options
+}
+
+// ImportInfo holds information about a protobuf import
+type ImportInfo struct {
+	Path   string
+	Public bool
+	Weak   bool
+}
+
+// extractFileLevelPackageAnnotation extracts @proto.package annotation from file-level comments
+func (g *Generator) extractFileLevelPackageAnnotation() string {
+	if g.ctx == nil || g.ctx.FileAnnotations == nil {
+		return ""
+	}
+
+	// Check all file annotations for @proto.package
+	for _, fileAnns := range g.ctx.FileAnnotations {
+		for _, ann := range fileAnns {
+			name := strings.ToLower(ann.Name)
+			if name == "package" || strings.HasSuffix(name, ".package") {
+				if pkgName, exists := ann.GetParamValue("name"); exists {
+					return pkgName
+				}
+				// If no name param, use the first positional parameter
+				if defaultValue, exists := ann.GetParamValue(""); exists {
+					return defaultValue
+				}
+			}
+		}
+	}
+
+	return ""
+}
+
+// extractFileLevelImports extracts @proto.import annotations from file-level comments
+func (g *Generator) extractFileLevelImports() []ImportInfo {
+	var imports []ImportInfo
+
+	// Check file-level annotations that were extracted during parsing
+	if g.ctx != nil && g.ctx.FileAnnotations != nil {
+		for _, fileAnns := range g.ctx.FileAnnotations {
+			for _, ann := range fileAnns {
+				name := strings.ToLower(ann.Name)
+				if name == "import" || strings.HasSuffix(name, ".import") {
+					// Extract import information
+					importInfo := ImportInfo{}
+
+					// Path is required
+					if path, exists := ann.GetParamValue("path"); exists {
+						importInfo.Path = path
+					} else {
+						// Skip if no path specified
+						continue
+					}
+
+					// Public is optional
+					if public, exists := ann.GetParamBool("public"); exists {
+						importInfo.Public = public
+					}
+
+					// Weak is optional
+					if weak, exists := ann.GetParamBool("weak"); exists {
+						importInfo.Weak = weak
+					}
+
+					imports = append(imports, importInfo)
+				}
+			}
+		}
+	}
+
+	return imports
 }
 
 func (g *Generator) writeImports(out *strings.Builder) error {
@@ -249,8 +346,13 @@ func (g *Generator) writeImports(out *strings.Builder) error {
 		imports[imp] = true
 	}
 
-	// Import annotations at package level are not available in GenerationContext.
-	// Users should configure imports via generator config.
+	// Add imports from @proto.import annotations
+	fileImports := g.extractFileLevelImports()
+	var annotationImports []ImportInfo // Store the imports with their modifiers
+	for _, importInfo := range fileImports {
+		imports[importInfo.Path] = true
+		annotationImports = append(annotationImports, importInfo)
+	}
 
 	// Write imports
 	if len(imports) > 0 {
@@ -260,7 +362,19 @@ func (g *Generator) writeImports(out *strings.Builder) error {
 		}
 		sort.Strings(sortedImports)
 		for _, imp := range sortedImports {
-			fmt.Fprintf(out, "import \"%s\";\n", imp)
+			// Check if this import has special modifiers (public/weak)
+			var prefix string
+			for _, annImport := range annotationImports {
+				if annImport.Path == imp {
+					if annImport.Public {
+						prefix = "public "
+					} else if annImport.Weak {
+						prefix = "weak "
+					}
+					break
+				}
+			}
+			fmt.Fprintf(out, "import %s\"%s\";\n", prefix, imp)
 		}
 		out.WriteString("\n")
 	}
@@ -588,8 +702,8 @@ func (g *Generator) getMessageNames(s *parser.StructInfo) []string {
 			if customName := ann.Params["name"]; customName != "" {
 				names = append(names, customName)
 			} else {
-				// Empty name means use default
-				names = append(names, "")
+				// Empty name means use struct name as default
+				names = append(names, s.Name)
 			}
 		}
 	}
@@ -620,10 +734,60 @@ func (g *Generator) generateMessage(out *strings.Builder, s *parser.StructInfo, 
 	messageReserveAll := g.shouldReserveAllFieldsForMessage(s, messageName)
 
 	// Reset field number for this message
-	fieldNum := g.formatGen.config.StartFieldNumber // Generate fields
+	fieldNum := g.formatGen.config.StartFieldNumber
+
+	// Group fields by oneof annotations
+	oneofGroups := g.groupFieldsByOneof(s.Fields, messageName)
+
+	// Generate oneof groups first
+	for groupName, fields := range oneofGroups {
+		fmt.Fprintf(out, "  oneof %s {\n", groupName)
+		for _, f := range fields {
+			if f.GoName == "" || len(f.GoName) == 0 || f.GoName[0] < 'A' || f.GoName[0] > 'Z' {
+				continue // skip unexported fields
+			}
+
+			// Check if field should be skipped for this specific message
+			isSkipped, _ := g.shouldSkipFieldForMessage(f, messageName)
+			if isSkipped {
+				continue
+			}
+
+			// Substitute generic types if needed
+			modifiedField := f
+			if len(typeSubstitutions) > 0 {
+				substitutedType := g.substituteGenericType(f.Type, typeSubstitutions)
+				modifiedField = &parser.FieldInfo{
+					Name:        f.Name,
+					GoName:      f.GoName,
+					Type:        substitutedType,
+					Tag:         f.Tag,
+					IsEmbedded:  f.IsEmbedded,
+					Annotations: f.Annotations,
+				}
+			}
+
+			// Get field number from annotation or auto-assign
+			num := g.getFieldNumber(modifiedField, &fieldNum)
+			fieldLine := g.generateField(modifiedField, num)
+			if fieldLine != "" {
+				// Remove the leading spaces since we're inside a oneof block
+				fieldLine = strings.TrimSpace(fieldLine)
+				fmt.Fprintf(out, "    %s\n", fieldLine)
+			}
+		}
+		fmt.Fprintf(out, "  }\n")
+	}
+
+	// Generate fields
 	for _, f := range s.Fields {
 		if f.GoName == "" || len(f.GoName) == 0 || f.GoName[0] < 'A' || f.GoName[0] > 'Z' {
 			// skip unexported fields
+			continue
+		}
+
+		// Skip fields that are part of oneof groups
+		if g.isFieldInOneof(f, messageName) {
 			continue
 		}
 
@@ -912,8 +1076,8 @@ func (g *Generator) getMessageDescription(s *parser.StructInfo, messageName stri
 		}
 	}
 
-	// Fall back to general description from all annotations
-	return g.getDescription(s.Annotations)
+	// Fall back to goschemagen description helper which includes comment extraction
+	return g.getStructDescription(s)
 }
 
 func (g *Generator) getFieldNumber(f *parser.FieldInfo, counter *int) int {
@@ -993,7 +1157,7 @@ func (g *Generator) generateField(f *parser.FieldInfo, number int) string {
 	fieldDef += ";"
 
 	// Add comment
-	if desc := g.getDescription(f.Annotations); desc != "" {
+	if desc := g.getFieldDescription(f); desc != "" {
 		fieldDef = fmt.Sprintf("// %s\n  %s", desc, fieldDef)
 	}
 
@@ -1024,7 +1188,7 @@ func (g *Generator) generateMapField(f *parser.FieldInfo, fieldName string, numb
 				mapDef += ";"
 
 				// Add comment
-				if desc := g.getDescription(f.Annotations); desc != "" {
+				if desc := g.getFieldDescription(f); desc != "" {
 					mapDef = fmt.Sprintf("// %s\n  %s", desc, mapDef)
 				}
 				return mapDef
@@ -1049,7 +1213,7 @@ func (g *Generator) generateMapField(f *parser.FieldInfo, fieldName string, numb
 			mapDef += ";"
 
 			// Add comment
-			if desc := g.getDescription(f.Annotations); desc != "" {
+			if desc := g.getFieldDescription(f); desc != "" {
 				mapDef = fmt.Sprintf("// %s\n  %s", desc, mapDef)
 			}
 			return mapDef
@@ -1334,13 +1498,39 @@ func (g *Generator) containsOption(options []string, optionName string) bool {
 	return false
 }
 
-func (g *Generator) getDescription(anns []annotations.Annotation) string {
-	for _, ann := range anns {
-		if desc := ann.Params["description"]; desc != "" {
-			return desc
-		}
-	}
-	return ""
+// func (g *Generator) getDescription(anns []*annotations.Annotation) string {
+// 	// First check annotations for explicit description
+// 	for _, ann := range anns {
+// 		if desc := ann.Params["description"]; desc != "" {
+// 			return desc
+// 		}
+// 	}
+// 	return ""
+// }
+
+// getStructDescription gets description for a struct using goschemagen helper
+func (g *Generator) getStructDescription(structInfo *parser.StructInfo) string {
+	return g.ctx.Config.GetStructDescription(structInfo)
+}
+
+// getFieldDescription gets description for a field using goschemagen helper
+func (g *Generator) getFieldDescription(fieldInfo *parser.FieldInfo) string {
+	return g.ctx.Config.GetFieldDescription(fieldInfo)
+}
+
+// getEnumDescription gets description for an enum using goschemagen helper
+func (g *Generator) getEnumDescription(enumInfo *parser.EnumInfo) string {
+	return g.ctx.Config.GetEnumDescription(enumInfo)
+}
+
+// getEnumValueDescription gets description for an enum value using goschemagen helper
+func (g *Generator) getEnumValueDescription(enumValue *parser.EnumValue) string {
+	return g.ctx.Config.GetEnumValueDescription(enumValue)
+}
+
+// getInterfaceDescription gets description for an interface using goschemagen helper
+func (g *Generator) getInterfaceDescription(interfaceInfo *parser.InterfaceInfo) string {
+	return g.ctx.Config.GetInterfaceDescription(interfaceInfo)
 }
 
 // func (g *Generator) toSnakeCase(s string) string {
@@ -1401,7 +1591,7 @@ func (g *Generator) generateEnum(out *strings.Builder, e *parser.EnumInfo) error
 	enumName := g.getEnumName(e)
 
 	// Write comment
-	if desc := g.getDescription(e.Annotations); desc != "" {
+	if desc := g.getEnumDescription(e); desc != "" {
 		fmt.Fprintf(out, "// %s\n", desc)
 	}
 
@@ -1425,7 +1615,7 @@ func (g *Generator) generateEnum(out *strings.Builder, e *parser.EnumInfo) error
 		valueLine := fmt.Sprintf("  %s = %d;", valueName, valueNum)
 
 		// Add comment
-		if desc := g.getDescription(v.Annotations); desc != "" {
+		if desc := g.getEnumValueDescription(v); desc != "" {
 			valueLine = fmt.Sprintf("  // %s\n%s", desc, valueLine)
 		}
 
@@ -1500,7 +1690,7 @@ func (g *Generator) generateService(out *strings.Builder, iface *parser.Interfac
 	serviceName := g.getServiceName(iface)
 
 	// Write comment
-	if desc := g.getDescription(iface.Annotations); desc != "" {
+	if desc := g.getInterfaceDescription(iface); desc != "" {
 		fmt.Fprintf(out, "// %s\n", desc)
 	}
 
@@ -1772,4 +1962,187 @@ func (g *Generator) extractTypeName(typeStr string) string {
 	}
 
 	return typeStr
+}
+
+// groupFieldsByOneof groups fields by their @proto.oneof annotation
+func (g *Generator) groupFieldsByOneof(fields []*parser.FieldInfo, messageName string) map[string][]*parser.FieldInfo {
+	oneofGroups := make(map[string][]*parser.FieldInfo)
+
+	for _, field := range fields {
+		for _, ann := range field.Annotations {
+			name := strings.ToLower(ann.Name)
+			if name == "oneof" || strings.HasSuffix(name, ".oneof") {
+				// Check if this annotation applies to current message
+				if !g.fieldAnnotationAppliesToMessage(field, messageName) {
+					continue
+				}
+
+				// Get oneof group name
+				if groupName, exists := ann.GetParamValue("group"); exists && groupName != "" {
+					oneofGroups[groupName] = append(oneofGroups[groupName], field)
+				} else if groupName := ann.Params[""]; groupName != "" {
+					// Support positional parameter
+					oneofGroups[groupName] = append(oneofGroups[groupName], field)
+				}
+				break
+			}
+		}
+	}
+
+	return oneofGroups
+}
+
+// isFieldInOneof checks if a field is part of a oneof group
+func (g *Generator) isFieldInOneof(field *parser.FieldInfo, messageName string) bool {
+	for _, ann := range field.Annotations {
+		name := strings.ToLower(ann.Name)
+		if name == "oneof" || strings.HasSuffix(name, ".oneof") {
+			// Check if this annotation applies to current message
+			if !g.fieldAnnotationAppliesToMessage(field, messageName) {
+				continue
+			}
+			return true
+		}
+	}
+	return false
+}
+
+// generateExtensions generates protobuf extensions from @proto.extend annotations
+func (g *Generator) generateExtensions(out *strings.Builder) error {
+	// Check for extension annotations in struct fields
+	for _, structInfo := range g.ctx.Structs {
+		for _, field := range structInfo.Fields {
+			for _, ann := range field.Annotations {
+				name := strings.ToLower(ann.Name)
+				if name == "extend" || strings.HasSuffix(name, ".extend") {
+					if err := g.generateExtension(out, &ann, field); err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// generateExtension generates a single protobuf extension
+func (g *Generator) generateExtension(out *strings.Builder, ann *annotations.Annotation, field *parser.FieldInfo) error {
+	// Get the target message to extend
+	targetMessage, exists := ann.GetParamValue("message")
+	if !exists {
+		// Skip if no target message specified
+		return nil
+	}
+
+	// Get extension field number
+	fieldNumber := g.formatGen.config.StartFieldNumber
+	if numStr, exists := ann.GetParamValue("number"); exists {
+		if num, err := strconv.Atoi(numStr); err == nil && num > 0 {
+			fieldNumber = num
+		}
+	}
+
+	// Get field name (default to struct field name)
+	fieldName := field.Name
+	if name, exists := ann.GetParamValue("name"); exists {
+		fieldName = name
+	}
+
+	// Get field type
+	fieldType := g.getProtoType(field)
+	if typeOverride, exists := ann.GetParamValue("type"); exists {
+		fieldType = typeOverride
+	}
+
+	// Write extension
+	if desc, exists := ann.GetParamValue("description"); exists && desc != "" {
+		fmt.Fprintf(out, "// %s\n", desc)
+	}
+	fmt.Fprintf(out, "extend %s {\n", targetMessage)
+	fmt.Fprintf(out, "  %s %s = %d;\n", fieldType, fieldName, fieldNumber)
+	fmt.Fprintf(out, "}\n\n")
+
+	return nil
+}
+
+// shouldSkipStruct checks if a struct should be skipped from generation
+func (g *Generator) shouldSkipStruct(structInfo *parser.StructInfo) bool {
+	// Check for @ignore annotation
+	for _, ann := range structInfo.Annotations {
+		name := strings.ToLower(ann.Name)
+		if name == "ignore" || name == "skip" || name == "omit" ||
+			strings.HasSuffix(name, ".ignore") || strings.HasSuffix(name, ".skip") || strings.HasSuffix(name, ".omit") {
+			return true
+		}
+	}
+	return false
+}
+
+// shouldSkipEnum checks if an enum should be skipped from generation
+func (g *Generator) shouldSkipEnum(enumInfo *parser.EnumInfo) bool {
+	// Check for @ignore annotation
+	for _, ann := range enumInfo.Annotations {
+		name := strings.ToLower(ann.Name)
+		if name == "ignore" || name == "skip" || name == "omit" ||
+			strings.HasSuffix(name, ".ignore") || strings.HasSuffix(name, ".skip") || strings.HasSuffix(name, ".omit") {
+			return true
+		}
+	}
+	return false
+}
+
+// getFieldJSONName gets the JSON field name for a field
+func (g *Generator) getFieldJSONName(field *parser.FieldInfo) string {
+	// Check if there's a JSON name override in annotations
+	for _, ann := range field.Annotations {
+		if ann.Name == "json" || ann.Name == "proto.json" {
+			if name, exists := ann.GetParamValue("name"); exists {
+				return name
+			}
+		}
+		if ann.Name == "field" || ann.Name == "proto.field" {
+			if name, exists := ann.GetParamValue("json_name"); exists {
+				return name
+			}
+		}
+	}
+
+	// Check struct tag for json name
+	if g.ctx != nil && g.ctx.FieldProcessor != nil {
+		pf := g.ctx.FieldProcessor.ProcessField(field)
+		if jsonTag := pf.Tags["json"]; jsonTag != "" && jsonTag != "-" {
+			parts := strings.Split(jsonTag, ",")
+			if parts[0] != "" {
+				return parts[0]
+			}
+		}
+	}
+
+	// Default to snake_case of field name
+	return g.toSnakeCase(field.Name)
+}
+
+// toSnakeCase converts camelCase to snake_case
+func (g *Generator) toSnakeCase(s string) string {
+	if s == "" {
+		return s
+	}
+
+	// Handle common acronyms and abbreviations
+	s = strings.ReplaceAll(s, "ID", "Id")
+	s = strings.ReplaceAll(s, "API", "Api")
+	s = strings.ReplaceAll(s, "URL", "Url")
+	s = strings.ReplaceAll(s, "HTTP", "Http")
+	s = strings.ReplaceAll(s, "JSON", "Json")
+	s = strings.ReplaceAll(s, "XML", "Xml")
+	s = strings.ReplaceAll(s, "UUID", "Uuid")
+
+	var result strings.Builder
+	for i, r := range s {
+		if i > 0 && r >= 'A' && r <= 'Z' {
+			result.WriteByte('_')
+		}
+		result.WriteRune(r)
+	}
+	return strings.ToLower(result.String())
 }

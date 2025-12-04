@@ -23,6 +23,10 @@ type Config struct {
 	// Example: "{schema_name}.proto" or "{package}.proto"
 	OutputFileName string `yaml:"output_file_name"`
 
+	// Output formats to generate (default: ["proto"])
+	// Supported: proto, json-schema, markdown, typescript, descriptor
+	OutputFormats []string `yaml:"output_formats"`
+
 	// Generation strategy: "single", "follow", "package", "namespace"
 	GenerationStrategy parser.GenStrategy `yaml:"generation_strategy"`
 

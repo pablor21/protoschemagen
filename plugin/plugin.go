@@ -119,9 +119,16 @@ func (p *Plugin) GenerateMulti(ctx *parser.GenerationContext) (*parser.Generated
 	// Update format generator config
 	p.config = cfg
 
+	// Ensure goschemagen Config is properly initialized
+	if cfg.UseCommentsAsDescription == nil {
+		defaultConfig := goschemagen.NewConfig()
+		cfg.Config = *defaultConfig
+	}
+
 	// Create generator with context
 	genContext := &goschemagen.GenerationContext{
-		GenerationContext: *ctx, // Copy the context content
+		Config:            &cfg.Config, // Set the goschemagen config
+		GenerationContext: *ctx,        // Copy the context content
 	}
 
 	gen := &Generator{

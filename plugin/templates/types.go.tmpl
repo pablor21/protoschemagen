@@ -49,9 +49,72 @@ func {{.Name}}FromProto(proto *{{$.ProtobufAlias}}.{{.Name}}) {{.PackageAlias}}.
 
 // IsZero{{.Name}} checks if the struct is its zero value
 func IsZero{{.Name}}(v {{.PackageAlias}}.{{.Name}}) bool {
-	// Use reflection or specific field checks for zero value detection
-	// This is a simplified implementation
-	return false // TODO: Implement proper zero value detection
+	// Check if all fields are zero values
+{{- range .Fields }}
+{{- if eq .Type "string" }}
+	if v.{{.GoName}} != "" {
+		return false
+	}
+{{- else if eq .Type "*string" }}
+	if v.{{.GoName}} != nil && *v.{{.GoName}} != "" {
+		return false
+	}
+{{- else if or (eq .Type "int") (eq .Type "int8") (eq .Type "int16") (eq .Type "int32") (eq .Type "int64") }}
+	if v.{{.GoName}} != 0 {
+		return false
+	}
+{{- else if or (eq .Type "*int") (eq .Type "*int8") (eq .Type "*int16") (eq .Type "*int32") (eq .Type "*int64") }}
+	if v.{{.GoName}} != nil && *v.{{.GoName}} != 0 {
+		return false
+	}
+{{- else if or (eq .Type "uint") (eq .Type "uint8") (eq .Type "uint16") (eq .Type "uint32") (eq .Type "uint64") }}
+	if v.{{.GoName}} != 0 {
+		return false
+	}
+{{- else if or (eq .Type "*uint") (eq .Type "*uint8") (eq .Type "*uint16") (eq .Type "*uint32") (eq .Type "*uint64") }}
+	if v.{{.GoName}} != nil && *v.{{.GoName}} != 0 {
+		return false
+	}
+{{- else if or (eq .Type "float32") (eq .Type "float64") }}
+	if v.{{.GoName}} != 0.0 {
+		return false
+	}
+{{- else if or (eq .Type "*float32") (eq .Type "*float64") }}
+	if v.{{.GoName}} != nil && *v.{{.GoName}} != 0.0 {
+		return false
+	}
+{{- else if eq .Type "bool" }}
+	if v.{{.GoName}} {
+		return false
+	}
+{{- else if eq .Type "*bool" }}
+	if v.{{.GoName}} != nil && *v.{{.GoName}} {
+		return false
+	}
+{{- else if eq .Type "time.Time" }}
+	if !v.{{.GoName}}.IsZero() {
+		return false
+	}
+{{- else if eq .Type "*time.Time" }}
+	if v.{{.GoName}} != nil && !v.{{.GoName}}.IsZero() {
+		return false
+	}
+{{- else if and (ge (len .Type) 2) (eq (slice .Type 0 2) "[]") }}
+	if len(v.{{.GoName}}) > 0 {
+		return false
+	}
+{{- else if and (ge (len .Type) 4) (eq (slice .Type 0 4) "map[") }}
+	if len(v.{{.GoName}}) > 0 {
+		return false
+	}
+{{- else }}
+	// For complex types, use reflection or custom logic
+	if v.{{.GoName}} != ({{.Type}}{}) {
+		return false
+	}
+{{- end }}
+{{- end }}
+	return true
 }
 
 // {{.Name}}SliceToProto converts []{{.PackageAlias}}.{{.Name}} to []*{{$.ProtobufAlias}}.{{.Name}}
@@ -114,6 +177,27 @@ func {{.Name}}SliceFromProto(proto []{{$.ProtobufAlias}}.{{.Name}}) []{{.Package
 		result[i] = {{.Name}}FromProto(v)
 	}
 	return result
+}
+{{- end }}
+{{- end }}
+
+{{- range .Types }}
+{{- if not .IsEnum }}
+// ConvertPointerToProto_{{.Name}} converts *{{.PackageAlias}}.{{.Name}} to *{{$.ProtobufAlias}}.{{.Name}}
+func ConvertPointerToProto_{{.Name}}(orig *{{.PackageAlias}}.{{.Name}}) *{{$.ProtobufAlias}}.{{.Name}} {
+	if orig == nil {
+		return nil
+	}
+	return {{.Name}}ToProto(*orig)
+}
+
+// ConvertPointerFromProto_{{.Name}} converts *{{$.ProtobufAlias}}.{{.Name}} to *{{.PackageAlias}}.{{.Name}}
+func ConvertPointerFromProto_{{.Name}}(proto *{{$.ProtobufAlias}}.{{.Name}}) *{{.PackageAlias}}.{{.Name}} {
+	if proto == nil {
+		return nil
+	}
+	result := {{.Name}}FromProto(proto)
+	return &result
 }
 {{- end }}
 {{- end }}

@@ -42,6 +42,21 @@ plugins:
     # Default: "{schema_name}.proto"
     output_file_name: "{schema_name}.proto"
 
+    # Output formats to generate
+    # Supported formats:
+    #   - "proto": Standard protobuf files (always generated)
+    #   - "json-schema": JSON Schema files (.schema.json)
+    #   - "markdown": Documentation in Markdown format (.md)
+    #   - "typescript": TypeScript interface definitions (.ts)
+    #   - "descriptor": Binary protobuf descriptors (.desc)
+    # Examples:
+    #   - ["proto"] - Only protobuf files (default)
+    #   - ["proto", "json-schema", "markdown"] - Proto + JSON Schema + docs
+    #   - ["proto", "typescript"] - Proto + TypeScript definitions
+    # Default: ["proto"]
+    output_formats:
+      - proto
+
     # Generation strategy for organizing output
     # Options:
     #   - "single": Generate one .proto file with all messages

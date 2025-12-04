@@ -23,6 +23,52 @@ func (g *StubGenerator) generateTypeAdapters() error {
 	return g.writeFile("types.go", content)
 }
 
+// generateValidationAdapters generates validation functions for protobuf types
+// func (g *StubGenerator) generateValidationAdapters() error {
+// 	// Create validation context and extract rules
+// 	validationCtx := NewValidationContext(g.ctx.Logger)
+// 	validationCtx.ExtractValidationRules(g.ctx.Structs)
+
+// 	// Only generate if we have validation rules
+// 	if !validationCtx.HasValidationRules() {
+// 		return nil
+// 	}
+
+// 	// Get template configuration
+// 	templateConfig := g.getTemplateConfig()
+// 	templateData := g.prepareTemplateData(templateConfig)
+
+// 	// Add validation-specific data
+// 	templateData.ValidationImports = validationCtx.GetValidationImports()
+// 	templateData.HasAnyValidation = true
+
+// 	// Add validation rules to each type
+// 	for i, typeInfo := range templateData.Types {
+// 		if rules, exists := validationCtx.Rules[typeInfo.Name]; exists {
+// 			templateData.Types[i].HasValidation = true
+// 			templateData.Types[i].ValidationRules = rules
+// 		}
+// 	}
+
+// 	// Use template-specific imports (add validation imports)
+// 	allImports := append(templateData.PackageImports, validationCtx.GetValidationImports()...)
+// 	templateData.PackageImports = g.getImportsForTemplate("validation", allImports)
+
+// 	// Execute validation template
+// 	templateNames := templateConfig.GetTemplateNames()
+// 	if templateNames["validation"] == "" {
+// 		// If no custom validation template, use default
+// 		templateNames["validation"] = "validation"
+// 	}
+
+// 	content, err := g.executeTemplateByName(templateNames["validation"], templateData)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to generate validation from template: %w", err)
+// 	}
+
+// 	return g.writeFile("validation.go", content)
+// }
+
 // // generateAdapterHeader generates the package header for adapter files
 // func (g *StubGenerator) generateAdapterHeader() string {
 // 	return `// Package adapter contains auto-generated type adapters

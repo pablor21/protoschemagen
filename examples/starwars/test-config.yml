@@ -16,7 +16,12 @@ plugins:
     package: starwars.v1
     auto_number_fields: true
     generation_strategy: follow
-    output: "schema/{name}.proto"
+    output: "schema/{format}/{name}.proto"
+    output_formats:
+      - proto
+      - json-schema
+      - markdown
+      - typescript
     generate_service: true
     generate_stubs:
       enabled: true

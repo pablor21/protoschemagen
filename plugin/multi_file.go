@@ -33,6 +33,11 @@ func (g *Generator) GenerateMulti() (*parser.GeneratedOutput, error) {
 		return nil, err
 	}
 
+	// Generate additional output formats if specified
+	if err := g.generateAdditionalFormats(output); err != nil {
+		g.ctx.Logger.Info(fmt.Sprintf("Failed to generate additional formats: %v", err))
+	}
+
 	// Generate stubs if enabled (but skip protoc for now)
 	if g.formatGen.config.GenerateStubs != nil && g.formatGen.config.GenerateStubs.Enabled {
 		stubGen, err := NewStubGenerator(g.formatGen.config.GenerateStubs, g.formatGen.config, g.ctx)
@@ -49,6 +54,85 @@ func (g *Generator) GenerateMulti() (*parser.GeneratedOutput, error) {
 	}
 
 	return output, nil
+}
+
+// generateAdditionalFormats generates files in additional output formats
+func (g *Generator) generateAdditionalFormats(output *parser.GeneratedOutput) error {
+	formats := g.formatGen.config.OutputFormats
+	if len(formats) == 0 {
+		return nil // No additional formats specified
+	}
+
+	mfg := &MultiFormatGenerator{generator: g}
+
+	// Create a map to track generated files to avoid duplicates
+	generatedFiles := make(map[string]bool)
+
+	// Store original proto files to avoid processing newly generated files
+	originalFiles := make([]*parser.GeneratedFile, len(output.Files))
+	copy(originalFiles, output.Files)
+
+	for _, format := range formats {
+		// Skip proto format as it's already generated
+		if strings.ToLower(format) == "proto" || strings.ToLower(format) == "protobuf" {
+			continue
+		}
+
+		content, ext, err := mfg.GenerateFormat(format)
+		if err != nil {
+			g.ctx.Logger.Info(fmt.Sprintf("Failed to generate %s format: %v", format, err))
+			continue
+		}
+
+		// Generate one file per original proto file for each format
+		for _, file := range originalFiles {
+			// Only process .proto files to avoid processing generated format files
+			if !strings.HasSuffix(file.Path, ".proto") {
+				continue
+			}
+
+			// Check if the original output path uses {format} placeholder
+			baseName := strings.TrimSuffix(file.Path, filepath.Ext(file.Path))
+			var newFileName string
+
+			// If the original template contained {format}, replace it
+			if strings.Contains(g.formatGen.config.Output, "{format}") {
+				// Replace the format in the original template pattern
+				formatPath := strings.ReplaceAll(g.formatGen.config.Output, "{format}", format)
+				// Extract the name pattern and apply it
+				if strings.Contains(formatPath, "{name}") {
+					// Extract the base name from the original file path
+					originalBaseName := filepath.Base(baseName)
+					formatPath = strings.ReplaceAll(formatPath, "{name}", originalBaseName)
+					// Replace the .proto extension with the correct extension for the format
+					formatPath = strings.TrimSuffix(formatPath, ".proto") + ext
+					newFileName = formatPath
+				} else {
+					formatPath = strings.TrimSuffix(formatPath, ".proto") + ext
+					newFileName = formatPath
+				}
+			} else {
+				// Use traditional extension-based naming
+				newFileName = baseName + ext
+			}
+
+			// Skip if we've already generated this file
+			if generatedFiles[newFileName] {
+				continue
+			}
+			generatedFiles[newFileName] = true
+
+			newFile := &parser.GeneratedFile{
+				Path:    newFileName,
+				Content: content,
+			}
+			output.Files = append(output.Files, newFile)
+		}
+
+		g.ctx.Logger.Info(fmt.Sprintf("Generated %s format files", format))
+	}
+
+	return nil
 }
 
 // generateSingle generates a single proto file with all schemas
@@ -426,6 +510,8 @@ func (g *Generator) resolveFileName(schemaName, name string) string {
 	// Replace placeholders
 	result := strings.ReplaceAll(pattern, "{schema_name}", schemaName)
 	result = strings.ReplaceAll(result, "{name}", name)
+	// Replace format placeholder with "proto" for protobuf files
+	result = strings.ReplaceAll(result, "{format}", "proto")
 
 	return result
 }
