@@ -1,0 +1,46 @@
+generate:
+  - protobuf
+
+packages:
+  - "./models/**"
+
+auto_generate:
+  enabled: true
+  strategy: all
+  only_referenced_by_annotated: false
+
+log_level: "debug"
+
+plugins:
+  protobuf:
+    enabled: true
+    output: "schema/{name}.proto"
+    package: "petstore.v1"
+    syntax: "proto3"
+    scan_options:
+      functions: "all"
+      type_functions: "all"
+      structs: "all"
+      enums: "all"
+      interfaces: "all"
+    options:
+      go_package: "github.com/example/petstore/v1"
+      csharp_namespace: "PetStore.V1"
+    comments_style: "leading"
+    use_comments_as_description: false
+    include_imports: true
+    generation_strategy: "follow"
+    auto_number_fields: true
+    generate_service: true
+    generate_stubs:
+      enabled: true
+      output_dir: "generated/proto/v1"
+      adapter_package: "generated/adapter"
+      streaming_support: true
+      original_service_interface: false  # Since we have concrete structs, not interfaces
+      registration_helpers: true
+      templates:
+        protobuf_alias: "pb"
+      type_mappings:
+        auto_detect: true
+        preserve_time_types: true

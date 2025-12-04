@@ -1,0 +1,1067 @@
+{
+  "annotations": [
+    {
+      "name": "package",
+      "params": [
+        {
+          "name": "name",
+          "types": [
+            "string"
+          ],
+          "enumValues": null,
+          "description": "Protobuf package name",
+          "isDefault": true,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": true
+        },
+        {
+          "name": "go_package",
+          "types": [
+            "string"
+          ],
+          "enumValues": null,
+          "description": "Go package path",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        },
+        {
+          "name": "java_package",
+          "types": [
+            "string"
+          ],
+          "enumValues": null,
+          "description": "",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        },
+        {
+          "name": "java_outer_classname",
+          "types": [
+            "string"
+          ],
+          "enumValues": null,
+          "description": "",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        },
+        {
+          "name": "optimize_for",
+          "types": [
+            "string"
+          ],
+          "enumValues": [
+            "SPEED",
+            "CODE_SIZE",
+            "LITE_RUNTIME"
+          ],
+          "description": "",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        }
+      ],
+      "validOn": [
+        "package",
+        "file"
+      ],
+      "aliases": null,
+      "description": "Package-level protobuf metadata",
+      "multiple": false,
+      "globalUnique": false,
+      "globalAliases": null
+    },
+    {
+      "name": "message",
+      "params": [
+        {
+          "name": "name",
+          "types": [
+            "string"
+          ],
+          "enumValues": null,
+          "description": "Custom message name",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        },
+        {
+          "name": "description",
+          "types": [
+            "string"
+          ],
+          "enumValues": null,
+          "description": "",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        },
+        {
+          "name": "reserved",
+          "types": [
+            "bool",
+            "string",
+            "[]string"
+          ],
+          "enumValues": null,
+          "description": "Mark all fields as reserved: empty or true (all), message name, or array of message names",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        }
+      ],
+      "validOn": [
+        "struct"
+      ],
+      "aliases": null,
+      "description": "Defines a protobuf message",
+      "multiple": false,
+      "globalUnique": false,
+      "globalAliases": null
+    },
+    {
+      "name": "enum",
+      "params": [
+        {
+          "name": "name",
+          "types": [
+            "string"
+          ],
+          "enumValues": null,
+          "description": "",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        },
+        {
+          "name": "description",
+          "types": [
+            "string"
+          ],
+          "enumValues": null,
+          "description": "",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        },
+        {
+          "name": "allow_alias",
+          "types": [
+            "bool"
+          ],
+          "enumValues": null,
+          "description": "",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        }
+      ],
+      "validOn": [
+        "enum"
+      ],
+      "aliases": null,
+      "description": "Defines a protobuf enum",
+      "multiple": false,
+      "globalUnique": false,
+      "globalAliases": null
+    },
+    {
+      "name": "enumvalue",
+      "params": [
+        {
+          "name": "name",
+          "types": [
+            "string"
+          ],
+          "enumValues": null,
+          "description": "",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        },
+        {
+          "name": "number",
+          "types": [
+            "int"
+          ],
+          "enumValues": null,
+          "description": "Enum value number",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        },
+        {
+          "name": "description",
+          "types": [
+            "string"
+          ],
+          "enumValues": null,
+          "description": "",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        }
+      ],
+      "validOn": [
+        "enumValue"
+      ],
+      "aliases": null,
+      "description": "Defines metadata for a single enum value",
+      "multiple": false,
+      "globalUnique": false,
+      "globalAliases": null
+    },
+    {
+      "name": "field",
+      "params": [
+        {
+          "name": "for",
+          "types": [
+            "string",
+            "[]string"
+          ],
+          "enumValues": null,
+          "description": "Apply field config only to specific messages: message name or array of names",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        },
+        {
+          "name": "name",
+          "types": [
+            "string"
+          ],
+          "enumValues": null,
+          "description": "Override protobuf field name",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        },
+        {
+          "name": "number",
+          "types": [
+            "int"
+          ],
+          "enumValues": null,
+          "description": "Field number in protobuf message",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        },
+        {
+          "name": "type",
+          "types": [
+            "string"
+          ],
+          "enumValues": null,
+          "description": "Protobuf type override (int32, int64, string, etc.)",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        },
+        {
+          "name": "repeated",
+          "types": [
+            "bool"
+          ],
+          "enumValues": null,
+          "description": "Mark field as repeated (array)",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        },
+        {
+          "name": "optional",
+          "types": [
+            "bool"
+          ],
+          "enumValues": null,
+          "description": "Mark field as optional (proto3)",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        },
+        {
+          "name": "packed",
+          "types": [
+            "bool"
+          ],
+          "enumValues": null,
+          "description": "Use packed encoding for repeated numeric fields",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        },
+        {
+          "name": "deprecated",
+          "types": [
+            "bool"
+          ],
+          "enumValues": null,
+          "description": "Mark field as deprecated",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        },
+        {
+          "name": "json_name",
+          "types": [
+            "string"
+          ],
+          "enumValues": null,
+          "description": "JSON field name override",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        },
+        {
+          "name": "oneof",
+          "types": [
+            "string"
+          ],
+          "enumValues": null,
+          "description": "Oneof group name",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        },
+        {
+          "name": "default",
+          "types": [
+            "string"
+          ],
+          "enumValues": null,
+          "description": "Default value (proto2)",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        },
+        {
+          "name": "for",
+          "types": [
+            "string",
+            "[]string"
+          ],
+          "enumValues": null,
+          "description": "Apply field config only to specific messages: message name or array of names",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        },
+        {
+          "name": "ignore",
+          "types": [
+            "null",
+            "bool",
+            "string",
+            "[]string"
+          ],
+          "enumValues": null,
+          "description": "Skip this field: empty or true (all messages), message name, or array of message names",
+          "isDefault": false,
+          "aliases": [
+            "omit",
+            "skip"
+          ],
+          "defaultValue": "*",
+          "isRequired": false
+        },
+        {
+          "name": "include",
+          "types": [
+            "null",
+            "bool",
+            "string",
+            "[]string"
+          ],
+          "enumValues": null,
+          "description": "Include only in messages: empty or true (all), message name, or array of names",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "*",
+          "isRequired": false
+        },
+        {
+          "name": "reserved",
+          "types": [
+            "null",
+            "bool",
+            "string",
+            "[]string"
+          ],
+          "enumValues": null,
+          "description": "Reserve field number when omitted: empty or true (all), message name, or array of names",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "*",
+          "isRequired": false
+        },
+        {
+          "name": "-",
+          "types": [
+            "string"
+          ],
+          "enumValues": null,
+          "description": "Ignore/skip this field (use '-' as value)",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        }
+      ],
+      "validOn": [
+        "field"
+      ],
+      "aliases": null,
+      "description": "Defines a protobuf field",
+      "multiple": true,
+      "globalUnique": false,
+      "globalAliases": null
+    },
+    {
+      "name": "oneof",
+      "params": [
+        {
+          "name": "name",
+          "types": [
+            "string"
+          ],
+          "enumValues": null,
+          "description": "",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": true
+        }
+      ],
+      "validOn": [
+        "field"
+      ],
+      "aliases": null,
+      "description": "Groups fields into a oneof",
+      "multiple": false,
+      "globalUnique": false,
+      "globalAliases": null
+    },
+    {
+      "name": "service",
+      "params": [
+        {
+          "name": "name",
+          "types": [
+            "string"
+          ],
+          "enumValues": null,
+          "description": "",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        },
+        {
+          "name": "description",
+          "types": [
+            "string"
+          ],
+          "enumValues": null,
+          "description": "",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        }
+      ],
+      "validOn": [
+        "interface",
+        "struct"
+      ],
+      "aliases": null,
+      "description": "Defines a gRPC service",
+      "multiple": false,
+      "globalUnique": false,
+      "globalAliases": null
+    },
+    {
+      "name": "rpc",
+      "params": [
+        {
+          "name": "name",
+          "types": [
+            "string"
+          ],
+          "enumValues": null,
+          "description": "",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        },
+        {
+          "name": "description",
+          "types": [
+            "string"
+          ],
+          "enumValues": null,
+          "description": "",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        },
+        {
+          "name": "input",
+          "types": [
+            "string"
+          ],
+          "enumValues": null,
+          "description": "Request message type",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        },
+        {
+          "name": "output",
+          "types": [
+            "string"
+          ],
+          "enumValues": null,
+          "description": "Response message type",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        },
+        {
+          "name": "client_streaming",
+          "types": [
+            "bool"
+          ],
+          "enumValues": null,
+          "description": "",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        },
+        {
+          "name": "server_streaming",
+          "types": [
+            "bool"
+          ],
+          "enumValues": null,
+          "description": "",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        }
+      ],
+      "validOn": [
+        "function"
+      ],
+      "aliases": null,
+      "description": "Defines an RPC method",
+      "multiple": false,
+      "globalUnique": false,
+      "globalAliases": null
+    },
+    {
+      "name": "map",
+      "params": [
+        {
+          "name": "key",
+          "types": [
+            "string"
+          ],
+          "enumValues": null,
+          "description": "Map key type",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": true
+        },
+        {
+          "name": "value",
+          "types": [
+            "string"
+          ],
+          "enumValues": null,
+          "description": "Map value type",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": true
+        },
+        {
+          "name": "number",
+          "types": [
+            "int"
+          ],
+          "enumValues": null,
+          "description": "Field number",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        }
+      ],
+      "validOn": [
+        "field"
+      ],
+      "aliases": null,
+      "description": "Defines a map field",
+      "multiple": false,
+      "globalUnique": false,
+      "globalAliases": null
+    },
+    {
+      "name": "import",
+      "params": [
+        {
+          "name": "path",
+          "types": [
+            "string"
+          ],
+          "enumValues": null,
+          "description": "",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": true
+        },
+        {
+          "name": "public",
+          "types": [
+            "bool"
+          ],
+          "enumValues": null,
+          "description": "",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        },
+        {
+          "name": "weak",
+          "types": [
+            "bool"
+          ],
+          "enumValues": null,
+          "description": "",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        }
+      ],
+      "validOn": [
+        "package",
+        "file"
+      ],
+      "aliases": null,
+      "description": "Imports another proto file",
+      "multiple": true,
+      "globalUnique": false,
+      "globalAliases": null
+    },
+    {
+      "name": "reserved",
+      "params": [
+        {
+          "name": "for",
+          "types": [
+            "string",
+            "[]string"
+          ],
+          "enumValues": null,
+          "description": "Apply reserved only to specific messages: message name or array of names",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        },
+        {
+          "name": "numbers",
+          "types": [
+            "string",
+            "[]int"
+          ],
+          "enumValues": null,
+          "description": "Reserved field numbers or ranges",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        },
+        {
+          "name": "names",
+          "types": [
+            "string",
+            "[]string"
+          ],
+          "enumValues": null,
+          "description": "Reserved field names",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        }
+      ],
+      "validOn": [
+        "struct"
+      ],
+      "aliases": null,
+      "description": "Reserves field numbers or names",
+      "multiple": true,
+      "globalUnique": false,
+      "globalAliases": null
+    },
+    {
+      "name": "option",
+      "params": [
+        {
+          "name": "name",
+          "types": [
+            "string"
+          ],
+          "enumValues": null,
+          "description": "",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": true
+        },
+        {
+          "name": "value",
+          "types": [
+            "string"
+          ],
+          "enumValues": null,
+          "description": "",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": true
+        }
+      ],
+      "validOn": [
+        "struct",
+        "field",
+        "enum",
+        "enumValue"
+      ],
+      "aliases": null,
+      "description": "Sets a protobuf option",
+      "multiple": true,
+      "globalUnique": false,
+      "globalAliases": null
+    },
+    {
+      "name": "extend",
+      "params": [
+        {
+          "name": "message",
+          "types": [
+            "string"
+          ],
+          "enumValues": null,
+          "description": "",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": true
+        }
+      ],
+      "validOn": [
+        "struct"
+      ],
+      "aliases": null,
+      "description": "Extends an existing message",
+      "multiple": false,
+      "globalUnique": false,
+      "globalAliases": null
+    },
+    {
+      "name": "ignore",
+      "params": [
+        {
+          "name": "for",
+          "types": [
+            "bool",
+            "string",
+            "[]string"
+          ],
+          "enumValues": null,
+          "description": "Message names to ignore for: true (all), message name, or array of names",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        },
+        {
+          "name": "reserved",
+          "types": [
+            "bool",
+            "string",
+            "[]string"
+          ],
+          "enumValues": null,
+          "description": "Reserve field numbers when ignored: empty or true (all), message name, or array of names",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        }
+      ],
+      "validOn": [
+        "struct",
+        "field",
+        "enum"
+      ],
+      "aliases": [
+        "skip",
+        "omit"
+      ],
+      "description": "Skip this type from proto generation",
+      "multiple": false,
+      "globalUnique": false,
+      "globalAliases": null
+    },
+    {
+      "name": "include",
+      "params": [
+        {
+          "name": "for",
+          "types": [
+            "bool",
+            "string",
+            "[]string"
+          ],
+          "enumValues": null,
+          "description": "Message names to include for: true (all), message name, or array of names",
+          "isDefault": false,
+          "aliases": null,
+          "defaultValue": "",
+          "isRequired": false
+        }
+      ],
+      "validOn": [
+        "field"
+      ],
+      "aliases": null,
+      "description": "Include this field/type only in specific messages",
+      "multiple": false,
+      "globalUnique": false,
+      "globalAliases": null
+    }
+  ],
+  "structTags": [
+    {
+      "name": "name",
+      "types": [
+        "string"
+      ],
+      "enumValues": null,
+      "description": "Override protobuf field name",
+      "aliases": null,
+      "defaultValue": "",
+      "isDefault": true
+    },
+    {
+      "name": "number",
+      "types": [
+        "int"
+      ],
+      "enumValues": null,
+      "description": "Field number in protobuf message",
+      "aliases": null,
+      "defaultValue": "",
+      "isDefault": false
+    },
+    {
+      "name": "type",
+      "types": [
+        "string"
+      ],
+      "enumValues": null,
+      "description": "Protobuf type override (int32, int64, string, etc.)",
+      "aliases": null,
+      "defaultValue": "",
+      "isDefault": false
+    },
+    {
+      "name": "repeated",
+      "types": [
+        "bool"
+      ],
+      "enumValues": null,
+      "description": "Mark field as repeated (array)",
+      "aliases": null,
+      "defaultValue": "",
+      "isDefault": false
+    },
+    {
+      "name": "optional",
+      "types": [
+        "bool"
+      ],
+      "enumValues": null,
+      "description": "Mark field as optional (proto3)",
+      "aliases": null,
+      "defaultValue": "",
+      "isDefault": false
+    },
+    {
+      "name": "packed",
+      "types": [
+        "bool"
+      ],
+      "enumValues": null,
+      "description": "Use packed encoding for repeated numeric fields",
+      "aliases": null,
+      "defaultValue": "",
+      "isDefault": false
+    },
+    {
+      "name": "deprecated",
+      "types": [
+        "bool"
+      ],
+      "enumValues": null,
+      "description": "Mark field as deprecated",
+      "aliases": null,
+      "defaultValue": "",
+      "isDefault": false
+    },
+    {
+      "name": "json_name",
+      "types": [
+        "string"
+      ],
+      "enumValues": null,
+      "description": "JSON field name override",
+      "aliases": null,
+      "defaultValue": "",
+      "isDefault": false
+    },
+    {
+      "name": "oneof",
+      "types": [
+        "string"
+      ],
+      "enumValues": null,
+      "description": "Oneof group name",
+      "aliases": null,
+      "defaultValue": "",
+      "isDefault": false
+    },
+    {
+      "name": "default",
+      "types": [
+        "string"
+      ],
+      "enumValues": null,
+      "description": "Default value (proto2)",
+      "aliases": null,
+      "defaultValue": "",
+      "isDefault": false
+    },
+    {
+      "name": "for",
+      "types": [
+        "string",
+        "[]string"
+      ],
+      "enumValues": null,
+      "description": "Apply field config only to specific messages: message name or array of names",
+      "aliases": null,
+      "defaultValue": "",
+      "isDefault": false
+    },
+    {
+      "name": "ignore",
+      "types": [
+        "null",
+        "bool",
+        "string",
+        "[]string"
+      ],
+      "enumValues": null,
+      "description": "Skip this field: empty or true (all messages), message name, or array of message names",
+      "aliases": [
+        "omit",
+        "skip"
+      ],
+      "defaultValue": "*",
+      "isDefault": false
+    },
+    {
+      "name": "include",
+      "types": [
+        "null",
+        "bool",
+        "string",
+        "[]string"
+      ],
+      "enumValues": null,
+      "description": "Include only in messages: empty or true (all), message name, or array of names",
+      "aliases": null,
+      "defaultValue": "*",
+      "isDefault": false
+    },
+    {
+      "name": "reserved",
+      "types": [
+        "null",
+        "bool",
+        "string",
+        "[]string"
+      ],
+      "enumValues": null,
+      "description": "Reserve field number when omitted: empty or true (all), message name, or array of names",
+      "aliases": null,
+      "defaultValue": "*",
+      "isDefault": false
+    },
+    {
+      "name": "-",
+      "types": [
+        "string"
+      ],
+      "enumValues": null,
+      "description": "Ignore/skip this field (use '-' as value)",
+      "aliases": null,
+      "defaultValue": "",
+      "isDefault": false
+    }
+  ]
+}

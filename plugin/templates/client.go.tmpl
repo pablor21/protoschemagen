@@ -1,0 +1,163 @@
+// Package adapter contains auto-generated gRPC client
+// Generated from protobuf annotations - DO NOT EDIT
+package adapter
+
+import (
+{{- range .PackageImports }}
+	"{{.}}"
+{{- end }}
+{{- if .ProtobufPackage }}
+	{{.ProtobufAlias}} "{{.ProtobufPackage}}"
+{{- end }}
+	"google.golang.org/grpc"
+)
+
+{{- range .Services }}
+{{- $serviceName := .Name }}
+// {{.Name}}Client wraps the gRPC client and provides Go types interface
+type {{.Name}}Client struct {
+	client {{$.ProtobufAlias}}.{{.Name}}Client
+}
+
+// New{{.Name}}Client creates a new client for the service
+func New{{.Name}}Client(conn *grpc.ClientConn) *{{.Name}}Client {
+	return &{{.Name}}Client{
+		client: {{$.ProtobufAlias}}.New{{.Name}}Client(conn),
+	}
+}
+
+{{- range .Methods }}
+{{- if not .IsStreaming }}
+// {{.Name}} calls the gRPC {{.Name}} method using Go types
+func (c *{{$serviceName}}Client) {{.Name}}(ctx context.Context, req models.{{.InputType}}) (models.{{.OutputType}}, error) {
+	// Convert Go request to protobuf
+	protoReq := {{.InputType}}ToProto(req)
+
+	// Call gRPC method
+	protoResp, err := c.client.{{.Name}}(ctx, protoReq)
+	if err != nil {
+		return models.{{.OutputType}}{}, err
+	}
+
+	// Convert protobuf response back to Go types
+	return {{.OutputType}}FromProto(protoResp), nil
+}
+{{- else if and (not .ClientStream) .ServerStream }}
+// {{.Name}} calls the gRPC {{.Name}} streaming method
+func (c *{{$serviceName}}Client) {{.Name}}(ctx context.Context, req models.{{.InputType}}) (chan models.{{.OutputType}}, error) {
+	// Convert Go request to protobuf
+	protoReq := {{.InputType}}ToProto(req)
+
+	// Call gRPC streaming method
+	stream, err := c.client.{{.Name}}(ctx, protoReq)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create output channel
+	resultChan := make(chan models.{{.OutputType}}, 100)
+
+	// Start goroutine to read from stream
+	go func() {
+		defer close(resultChan)
+		for {
+			resp, err := stream.Recv()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				// TODO: Handle error better
+				break
+			}
+			resultChan <- {{.OutputType}}FromProto(resp)
+		}
+	}()
+
+	return resultChan, nil
+}
+{{- else if and .ClientStream (not .ServerStream) }}
+// {{.Name}} calls the gRPC {{.Name}} client streaming method
+func (c *{{$serviceName}}Client) {{.Name}}(ctx context.Context, inputChan chan models.{{.InputType}}) (models.{{.OutputType}}, error) {
+	// Call gRPC streaming method
+	stream, err := c.client.{{.Name}}(ctx)
+	if err != nil {
+		return models.{{.OutputType}}{}, err
+	}
+
+	// Send data from input channel in goroutine and wait for completion
+	sendDone := make(chan error, 1)
+	go func() {
+		defer stream.CloseSend()
+		for input := range inputChan {
+			protoReq := {{.InputType}}ToProto(input)
+			if err := stream.Send(protoReq); err != nil {
+				sendDone <- err
+				return
+			}
+		}
+		sendDone <- nil
+	}()
+
+	// Wait for sending to complete or timeout
+	select {
+	case err := <-sendDone:
+		if err != nil {
+			return models.{{.OutputType}}{}, err
+		}
+	case <-ctx.Done():
+		return models.{{.OutputType}}{}, ctx.Err()
+	}
+
+	// Receive final response
+	protoResp, err := stream.CloseAndRecv()
+	if err != nil {
+		return models.{{.OutputType}}{}, err
+	}
+
+	return {{.OutputType}}FromProto(protoResp), nil
+}
+{{- else }}
+// {{.Name}} calls the gRPC {{.Name}} bidirectional streaming method
+func (c *{{$serviceName}}Client) {{.Name}}(ctx context.Context, inputChan chan models.{{.InputType}}) (chan models.{{.OutputType}}, error) {
+	// Call gRPC streaming method
+	stream, err := c.client.{{.Name}}(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create output channel
+	resultChan := make(chan models.{{.OutputType}}, 100)
+
+	// Start goroutine to send data
+	go func() {
+		defer stream.CloseSend()
+		for input := range inputChan {
+			protoReq := {{.InputType}}ToProto(input)
+			if err := stream.Send(protoReq); err != nil {
+				// TODO: Handle error better
+				break
+			}
+		}
+	}()
+
+	// Start goroutine to receive data
+	go func() {
+		defer close(resultChan)
+		for {
+			resp, err := stream.Recv()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				// TODO: Handle error better
+				break
+			}
+			resultChan <- {{.OutputType}}FromProto(resp)
+		}
+	}()
+
+	return resultChan, nil
+}
+{{- end }}
+{{- end }}
+{{- end }}

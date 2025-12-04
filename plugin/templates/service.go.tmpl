@@ -1,0 +1,30 @@
+// Package adapter contains auto-generated service interfaces
+// Generated from protobuf annotations - DO NOT EDIT
+package adapter
+
+import (
+{{- range .PackageImports }}
+	"{{.}}"
+{{- end }}
+)
+
+{{- range .Services }}
+// {{.Name}} defines the service interface using original Go types
+type {{.Name}} interface {
+{{- range .Methods }}
+	// {{.Name}} implements the {{.Name}} RPC method
+{{- if .IsStreaming }}
+{{- if and .ClientStream .ServerStream }}
+	{{.Name}}(stream chan models.{{.InputType}}) (chan models.{{.OutputType}}, error)
+{{- else if .ClientStream }}
+	{{.Name}}(input chan models.{{.InputType}}) (models.{{.OutputType}}, error)
+{{- else }}
+	{{.Name}}(req models.{{.InputType}}) (chan models.{{.OutputType}}, error)
+{{- end }}
+{{- else }}
+	{{.Name}}(req models.{{.InputType}}) (models.{{.OutputType}}, error)
+{{- end }}
+{{- end }}
+}
+
+{{- end }}

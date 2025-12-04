@@ -1,0 +1,517 @@
+# Protobuf Generator Default Configuration
+# This file contains all available options for the Protobuf generator with explanations.
+# You can use this as a reference or extend it in your own generators.yml file.
+
+generate:
+  - protobuf
+
+packages:
+  - ./**/*.go
+
+plugins:
+  protobuf:
+    # Enable or disable the Protobuf generator
+    # Default: true
+    enabled: true
+
+    # =============================================================================
+    # OUTPUT CONFIGURATION
+    # =============================================================================
+
+    # Output directory or file path for the generated protobuf files
+    # When generation_strategy is "single", this is the output file path
+    # When using multi-file strategies, this is the base directory
+    # Supports placeholders:
+    #   {schema_name} - Replaced with the schema name from @schema annotation
+    #   {namespace} - Replaced with the namespace from @namespace annotation
+    #   {package} - Replaced with Go package name
+    # Examples:
+    #   - "schema.proto" - Single file output
+    #   - "proto/" - Directory for multiple files
+    #   - "proto/{namespace}.proto" - Multiple files by namespace
+    # Default: ""
+    output: ""
+
+    # Output file name pattern (supports placeholders)
+    # Used when output is a directory or when generation_strategy creates multiple files
+    # Placeholders: {schema_name}, {package}, {namespace}
+    # Examples:
+    #   - "{schema_name}.proto"
+    #   - "{package}.proto"
+    #   - "{namespace}-messages.proto"
+    # Default: "{schema_name}.proto"
+    output_file_name: "{schema_name}.proto"
+
+    # Generation strategy for organizing output
+    # Options:
+    #   - "single": Generate one .proto file with all messages
+    #   - "multiple": Separate file per message type
+    #   - "package": Separate file per Go package
+    #   - "follow": One proto file per Go source file
+    #   - "namespace": Separate file per namespace (requires @namespace annotations)
+    # Default: "single"
+    generation_strategy: single
+
+    # DEPRECATED: Use generation_strategy instead
+    # Legacy strategy field for backward compatibility
+    strategy: ""
+
+    # =============================================================================
+    # PROTOBUF SPECIFICATION
+    # =============================================================================
+
+    # Protobuf syntax version
+    # Options:
+    #   - "proto2": Protocol Buffers version 2 (legacy)
+    #   - "proto3": Protocol Buffers version 3 (recommended)
+    # Default: "proto3"
+    syntax: proto3
+
+    # Package name for the protobuf files
+    # The package directive in the .proto file
+    # Example: "api.v1" results in: package api.v1;
+    # Default: "" (no package)
+    package: ""
+
+    # =============================================================================
+    # LANGUAGE-SPECIFIC OPTIONS
+    # =============================================================================
+
+    # Go package import path
+    # Used for go_package option
+    # Example: "github.com/your-org/your-project/proto/v1"
+    # Default: "" (auto-detected from module)
+    go_package: ""
+
+    # Java package name
+    # Used for java_package option
+    # Example: "com.yourcompany.yourproject.v1"
+    # Default: ""
+    java_package: ""
+
+    # Java outer class name
+    # Used for java_outer_classname option
+    # Example: "YourProtoMessages"
+    # Default: ""
+    java_outer_class: ""
+
+    # Optimization strategy
+    # Options:
+    #   - "SPEED": Optimize for fast execution (default)
+    #   - "CODE_SIZE": Optimize for smaller code size
+    #   - "LITE_RUNTIME": Use lite runtime for mobile/embedded
+    # Default: ""
+    optimize_for: ""
+
+    # =============================================================================
+    # SERVICE GENERATION
+    # =============================================================================
+
+    # Generate gRPC service definitions
+    # When true, generates service and rpc definitions from functions
+    # Example:
+    #   service UserService {
+    #     rpc GetUser(GetUserRequest) returns (User);
+    #   }
+    # Default: false
+    generate_service: false
+
+    # =============================================================================
+    # FIELD NUMBERING
+    # =============================================================================
+
+    # Automatically number message fields
+    # When true, automatically assigns field numbers (1, 2, 3, ...)
+    # When false, requires @proto:field annotations with explicit numbers
+    # Default: true
+    auto_number_fields: true
+
+    # Starting field number for auto-numbering
+    # First field will use this number, subsequent fields increment by 1
+    # Default: 1
+    start_field_number: 1
+
+    # Reserved field numbers
+    # Prevents field numbers from being reused
+    # Can be individual numbers or ranges
+    # Examples:
+    #   - [2, 15] - Reserve numbers 2 and 15
+    #   - [9, 10, 11] - Reserve consecutive numbers
+    # Default: []
+    reserved_numbers: []
+
+    # Reserved field names
+    # Prevents field names from being reused
+    # Examples:
+    #   - ["old_field", "deprecated_field"]
+    # Default: []
+    reserved_names: []
+
+    # =============================================================================
+    # TYPE MAPPINGS
+    # =============================================================================
+
+    # Custom type mappings from Go types to Protobuf types
+    # Maps Go type names to protobuf type names
+    # Examples:
+    #   "time.Time": "google.protobuf.Timestamp"
+    #   "custom.UUID": "string"
+    # Default: {}
+    type_mappings: {}
+
+    # =============================================================================
+    # IMPORTS AND WELL-KNOWN TYPES
+    # =============================================================================
+
+    # Use Google's well-known types
+    # When true, imports and uses google.protobuf types
+    # Examples: google.protobuf.Timestamp, google.protobuf.Duration
+    # Default: true
+    well_known_types: true
+
+    # Custom import statements
+    # Additional .proto files to import
+    # Examples:
+    #   - "google/api/annotations.proto"
+    #   - "custom/types.proto"
+    # Default: []
+    custom_imports: []
+
+    # =============================================================================
+    # FILE-LEVEL OPTIONS
+    # =============================================================================
+
+    # Protobuf file-level options
+    # These are written as: option <key> = "<value>";
+    # Supports all protobuf file options for different target languages
+    #
+    # Common options:
+    #   go_package: Go import path
+    #   java_package: Java package name
+    #   java_outer_classname: Java outer class name
+    #   java_multiple_files: Generate separate file per Java class
+    #   csharp_namespace: C# namespace
+    #   php_namespace: PHP namespace
+    #   ruby_package: Ruby module name
+    #   objc_class_prefix: Objective-C class prefix
+    #   optimize_for: Optimization strategy
+    #   cc_enable_arenas: Enable C++ arena allocation
+    #   deprecated: Mark file as deprecated
+    #
+    # Default: {}
+    options: {}
+    # Example:
+    # options:
+    #   go_package: "github.com/your-org/your-project/proto/v1"
+    #   java_package: "com.yourcompany.yourproject.v1"
+    #   java_multiple_files: "true"
+    #   csharp_namespace: "YourCompany.YourProject.V1"
+    #   optimize_for: "SPEED"
+
+    # =============================================================================
+    # NAMING AND TRANSFORMATION OPTIONS
+    # =============================================================================
+
+    # Use regular comments as descriptions
+    # When true, comments above types/fields become comments in the .proto file
+    # When false, only @description annotations are used
+    # Security Note: Keep false if comments contain sensitive implementation details
+    # Default: false
+    use_comments_as_description: false
+
+    # Field naming case transformation
+    # Options:
+    #   - "snake": snake_case (proto3 standard)
+    #   - "camel": camelCase
+    #   - "pascal": PascalCase
+    #   - "kebab": kebab-case
+    #   - "original": Keep original Go field names
+    # Default: "snake"
+    field_case: snake
+
+    # Use JSON tag names for field names
+    # When true, uses json:"fieldName" tag value instead of Go field name
+    # Default: true
+    use_json_tag: true
+
+    # Type name prefix to add
+    # Example: "Proto" makes ProtoUser from User
+    # Default: ""
+    add_type_prefix: ""
+
+    # Type name suffix to add
+    # Example: "Message" makes UserMessage from User
+    # Default: ""
+    add_type_suffix: ""
+
+    # Prefix to strip from type names
+    # Example: "Model" strips Model from ModelUser -> User
+    # Default: ""
+    strip_prefix: ""
+
+    # Suffix to strip from type names
+    # Example: "Entity" strips Entity from UserEntity -> User
+    # Default: ""
+    strip_suffix: ""
+
+    # Enum name prefix to add
+    # Example: "Proto" makes ProtoStatus from Status
+    # Default: ""
+    add_enum_prefix: ""
+
+    # Enum name suffix to add
+    # Example: "Enum" makes StatusEnum from Status
+    # Default: ""
+    add_enum_suffix: ""
+
+    # Prefix to strip from enum names
+    # Example: "Enum" strips Enum from EnumStatus -> Status
+    # Default: ""
+    strip_enum_prefix: ""
+
+    # Suffix to strip from enum names
+    # Example: "Type" strips Type from StatusType -> Status
+    # Default: ""
+    strip_enum_suffix: ""
+
+    # Enum value case transformation
+    # Options:
+    #   - "upper": UPPER_SNAKE_CASE (proto3 standard)
+    #   - "lower": lower_case
+    #   - "camel": camelCase
+    #   - "pascal": PascalCase
+    #   - "original": Keep original Go names
+    # Default: "upper"
+    enum_value_case: upper
+
+    # =============================================================================
+    # FEATURE FLAGS
+    # =============================================================================
+
+    # Enable generic types support
+    # When true, processes Go generic types and type constraints
+    # Default: true
+    enable_generics: true
+
+    # Include empty schemas in output
+    # When false, skips generating files with no messages
+    # Default: false
+    include_empty_schemas: false
+
+    # Skip generating files that already exist
+    # When true, preserves existing files instead of overwriting
+    # Default: false
+    skip_existing: false
+
+    # Infer interface implementations
+    # When true, automatically detects interface implementations
+    # and generates appropriate protobuf oneof patterns
+    # Default: true
+    infer_interface_implements: true
+
+    # =============================================================================
+    # PACKAGES AND SCANNING
+    # =============================================================================
+
+    # Override packages to scan (plugin-level override)
+    # When specified, overrides the root-level packages configuration
+    # Examples:
+    #   - ["./proto/**/*.go"]
+    #   - ["./api/**", "./types/**"]
+    # Default: [] (uses root-level packages)
+    packages: []
+
+    # Annotation prefix override
+    # Override the global annotation prefix for this plugin
+    # Example: "proto" to use @proto:message instead of @protobuf:message
+    # Default: null (uses global setting)
+    annotation_prefix: null
+
+    # Multiple annotation prefixes
+    # Support multiple prefixes for backward compatibility
+    # Example: ["protobuf", "proto", "pb"]
+    # Default: [] (uses annotation_prefix or global setting)
+    annotation_prefixes: []
+
+    # Struct tag name to read annotations from
+    # Example: "protobuf" to read from protobuf:"field:1,name:user_name"
+    # Default: null (uses global setting or "gonnotation")
+    struct_tag_name: null
+
+    # =============================================================================
+    # LOGGING AND DEBUGGING
+    # =============================================================================
+
+    # Plugin-level log level override
+    # Options: "trace", "debug", "info", "warn", "error", "fatal"
+    # Default: null (uses global log level)
+    log_level: null
+
+    # =============================================================================
+    # KNOWN TYPES MAPPING
+    # =============================================================================
+
+    # Core-level known types mapping (inherited from root configuration)
+    # Format-specific known types mapping (extends core configuration)
+    # Only defines Protobuf message types - model patterns inherited from core config
+    # If model is specified here, it merges with (doesn't replace) the core model patterns
+    known_types:
+      Time:
+        type: google.protobuf.Timestamp  # Protobuf type
+      Duration:
+        type: google.protobuf.Duration  # Protobuf type
+      UUID:
+        type: string  # Protobuf type
+      URL:
+        type: string  # Protobuf type
+
+    # Generate oneof for union types
+    # When true, generates oneof fields for discriminated unions
+    # Default: false
+    generate_oneof: false
+
+    # Use well-known types
+    # When true, uses google.protobuf well-known types
+    # Examples: google.protobuf.Timestamp, google.protobuf.Duration
+    # Default: true
+    use_well_known_types: true
+
+    # Protobuf file-level options
+    # These are written as: option <key> = "<value>";
+    # Supports all protobuf file options for different languages:
+    #
+    # Go:
+    #   go_package: "github.com/your-org/your-project/proto/v1"
+    #
+    # C#:
+    #   csharp_namespace: "YourCompany.YourProject.V1"
+    #
+    # Java:
+    #   java_package: "com.yourcompany.yourproject.v1"
+    #   java_outer_classname: "YourProto"
+    #   java_multiple_files: "true"
+    #
+    # Python:
+    #   py_generic_services: "true"
+    #
+    # PHP:
+    #   php_namespace: "YourCompany\\YourProject\\V1"
+    #   php_metadata_namespace: "YourCompany\\YourProject\\V1\\Metadata"
+    #
+    # Ruby:
+    #   ruby_package: "YourCompany::YourProject::V1"
+    #
+    # Objective-C:
+    #   objc_class_prefix: "YCP"
+    #
+    # Other:
+    #   optimize_for: "SPEED" | "CODE_SIZE" | "LITE_RUNTIME"
+    #   cc_enable_arenas: "true"
+    #   deprecated: "false"
+    #
+    # NOTE: These options are applied to the main options configuration above.
+
+    # Field naming convention
+    # How to convert Go field names to protobuf field names
+    # Options:
+    #   - "snake_case": user_name, created_at (recommended for proto3)
+    #   - "camelCase": userName, createdAt
+    #   - "PascalCase": UserName, CreatedAt
+    # Default: "snake_case"
+    field_naming: snake_case
+
+    # Enum naming convention
+    # How to convert Go enum values to protobuf enum values
+    # Options:
+    #   - "SCREAMING_SNAKE_CASE": USER_ROLE_ADMIN (recommended)
+    #   - "PascalCase": UserRoleAdmin
+    #   - "preserve": Keep original Go constant name
+    # Default: "SCREAMING_SNAKE_CASE"
+    enum_naming: SCREAMING_SNAKE_CASE
+
+    # Generate enum zero value
+    # When true, ensures enums have a zero value (required by proto3)
+    # Example: USER_ROLE_UNSPECIFIED = 0;
+    # Default: true
+    generate_enum_zero_value: true
+
+    # Zero value suffix for enums
+    # Suffix added to enum zero values
+    # Example: "UNSPECIFIED" results in USER_ROLE_UNSPECIFIED
+    # Default: "UNSPECIFIED"
+    enum_zero_value_suffix: UNSPECIFIED
+
+    # Preserve unknown fields
+    # When true, adds option to preserve unknown fields during parsing
+    # Useful for forward/backward compatibility
+    # Default: false
+    preserve_unknown_fields: false
+
+# =============================================================================
+# USAGE EXAMPLES
+# =============================================================================
+
+# Example: Extend this config in your project
+# Create generators.yml:
+#
+# extends: path/to/protobuf.generators.yml
+#
+# plugins:
+#   protobuf:
+#     output: "proto/schema.proto"
+#     syntax: proto3
+#     package: "api.v1"
+#     generate_service: true
+#     options:
+#       go_package: "github.com/your-org/your-project/proto/v1"
+#       java_package: "com.yourcompany.yourproject.v1"
+#       csharp_namespace: "YourCompany.YourProject.V1"
+
+# Example: Multi-file generation with custom numbering
+# generators.yml:
+#
+# extends: path/to/protobuf.generators.yml
+#
+# plugins:
+#   protobuf:
+#     output: "proto/"
+#     output_file_name: "{package}.proto"
+#     generation_strategy: package
+#     auto_number_fields: false
+#     reserved_numbers: [1, 2, 3]
+#     reserved_names: ["deprecated_field"]
+
+# Example: gRPC service generation with multiple languages
+# generators.yml:
+#
+# extends: path/to/protobuf.generators.yml
+#
+# plugins:
+#   protobuf:
+#     generate_service: true
+#     syntax: proto3
+#     package: "api.user.v1"
+#     options:
+#       go_package: "github.com/your-org/your-project/gen/api/user/v1"
+#       java_package: "com.yourcompany.yourproject.api.user.v1"
+#       java_multiple_files: "true"
+#       csharp_namespace: "YourCompany.YourProject.Api.User.V1"
+#       php_namespace: "YourCompany\\YourProject\\Api\\User\\V1"
+#       ruby_package: "YourCompany::YourProject::Api::User::V1"
+
+# Example: Custom field naming and type mappings
+# generators.yml:
+#
+# extends: path/to/protobuf.generators.yml
+#
+# plugins:
+#   protobuf:
+#     field_case: camel
+#     add_type_suffix: "Proto"
+#     strip_prefix: "Model"
+#     type_mappings:
+#       "custom.BigInt": "int64"
+#       "custom.Decimal": "string"
+#     custom_imports:
+#       - "google/api/annotations.proto"
+#       - "google/protobuf/field_mask.proto"

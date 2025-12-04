@@ -1,0 +1,135 @@
+// Package adapter contains auto-generated gRPC service adapter
+// Generated from protobuf annotations - DO NOT EDIT
+package adapter
+
+import (
+{{- range .PackageImports }}
+	"{{.}}"
+{{- end }}
+{{- if .ProtobufPackage }}
+	{{.ProtobufAlias}} "{{.ProtobufPackage}}"
+{{- end }}
+)
+
+{{- range .Services }}
+{{- $serviceName := .Name }}
+
+// {{.Name}}Adapter adapts models.{{.Name}} to gRPC pb.{{.Name}}Server
+type {{.Name}}Adapter struct {
+	pb.Unimplemented{{.Name}}Server
+	service models.{{.Name}}
+}
+
+// New{{.Name}}Adapter creates a new {{.Name}}Adapter
+func New{{.Name}}Adapter(service models.{{.Name}}) *{{.Name}}Adapter {
+	return &{{.Name}}Adapter{
+		service: service,
+	}
+}
+
+{{- range .Methods }}
+
+{{- if .IsStreaming }}
+{{- if and .ClientStream .ServerStream }}
+// {{.Name}} implements bidirectional streaming RPC
+func (a *{{$serviceName}}Adapter) {{.Name}}(stream pb.{{$serviceName}}_{{.Name}}Server) error {
+	ctx := stream.Context()
+	
+	// Collect input stream into slice
+	var inputs []models.{{.InputType}}
+	for {
+		req, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		inputs = append(inputs, {{.InputType}}FromProto(req))
+	}
+	
+	// Call service method
+	results, err := a.service.{{.Name}}(ctx, inputs)
+	if err != nil {
+		return err
+	}
+	
+	// Send all results
+	for _, item := range results {
+		if err := stream.Send({{.OutputType}}ToProto(item)); err != nil {
+			return err
+		}
+	}
+	
+	return nil
+}
+
+{{- else if .ClientStream }}
+// {{.Name}} implements client streaming RPC
+func (a *{{$serviceName}}Adapter) {{.Name}}(stream pb.{{$serviceName}}_{{.Name}}Server) error {
+	ctx := stream.Context()
+	
+	// Collect input stream into slice
+	var inputs []models.{{.InputType}}
+	for {
+		req, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		inputs = append(inputs, {{.InputType}}FromProto(req))
+	}
+	
+	// Call service method
+	result, err := a.service.{{.Name}}(ctx, inputs)
+	if err != nil {
+		return err
+	}
+	
+	// Send response
+	return stream.SendAndClose({{.OutputType}}ToProto(result))
+}
+
+{{- else }}
+// {{.Name}} implements server streaming RPC
+func (a *{{$serviceName}}Adapter) {{.Name}}(req *pb.{{.InputType}}, stream pb.{{$serviceName}}_{{.Name}}Server) error {
+	// Convert request and call service
+	goReq := {{.InputType}}FromProto(req)
+	ctx := stream.Context()
+	results, err := a.service.{{.Name}}(ctx, goReq)
+	if err != nil {
+		return err
+	}
+	
+	// Stream responses to client
+	for _, item := range results {
+		if err := stream.Send({{.OutputType}}ToProto(item)); err != nil {
+			return err
+		}
+	}
+	
+	return nil
+}
+{{- end }}
+
+{{- else }}
+// {{.Name}} implements unary RPC
+func (a *{{$serviceName}}Adapter) {{.Name}}(ctx context.Context, req *pb.{{.InputType}}) (*pb.{{.OutputType}}, error) {
+	// Convert request
+	goReq := {{.InputType}}FromProto(req)
+	
+	// Call service method
+	result, err := a.service.{{.Name}}(ctx, goReq)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Convert and return response
+	return {{.OutputType}}ToProto(result), nil
+}
+{{- end }}
+
+{{- end }}
+{{- end }}

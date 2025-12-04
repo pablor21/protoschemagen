@@ -1,0 +1,38 @@
+generate:
+  - protobuf
+
+packages:
+  - "./models/**"
+
+auto_generate:
+  enabled: true
+  strategy: all
+  only_referenced_by_annotated: false
+
+plugins:
+  protobuf:
+    enabled: true
+    syntax: proto3
+    package: starwars.v1
+    auto_number_fields: true
+    generation_strategy: follow
+    output: "schema/{name}.proto"
+    generate_service: true
+    generate_stubs:
+      enabled: true
+      adapter_package: "generated/adapter"
+      output_dir: "generated/proto/v1"  # Directory for generated protobuf Go files
+      original_service_interface: false
+      streaming_support: true
+      registration_helpers: true
+      type_mappings:
+        auto_detect: true
+        preserve_time_types: true
+      templates:
+        protobuf_alias: "pb"
+    comments_style: leading
+    use_comments_as_description: false
+    include_imports: true
+    options:
+      go_package: "github.com/example/proto/starwars/v1"
+      csharp_namespace: "StarWars.V1"

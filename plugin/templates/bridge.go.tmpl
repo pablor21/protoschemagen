@@ -1,0 +1,57 @@
+// Package adapter contains auto-generated service bridge
+// Generated from protobuf annotations - DO NOT EDIT
+package adapter
+
+import (
+{{- range .PackageImports }}
+	"{{.}}"
+{{- end }}
+)
+
+{{- range .Services }}
+{{- $serviceName := .Name }}
+
+{{- if .IsStruct }}
+// New{{.Name}}Bridge creates a bridge that directly wraps the original service
+// For struct services, we return the service directly since it already implements the methods
+func New{{.Name}}Bridge(service *models.{{.Name}}) *models.{{.Name}} {
+	return service
+}
+{{- else }}
+// {{.Name}}Bridge implements the adapter interface by directly using the original service
+type {{.Name}}Bridge struct {
+	originalService models.{{.Name}}
+}
+
+// New{{.Name}}Bridge creates a bridge that directly wraps the original service
+func New{{.Name}}Bridge(service models.{{.Name}}) models.{{.Name}} {
+	return &{{.Name}}Bridge{
+		originalService: service,
+	}
+}
+
+{{- range .Methods }}
+{{- if not .IsStreaming }}
+// {{.Name}} implements the adapter interface by calling the original service
+func (b *{{$serviceName}}Bridge) {{.Name}}(ctx context.Context, req models.{{.InputType}}) (models.{{.OutputType}}, error) {
+	return b.originalService.{{.Name}}(ctx, req)
+}
+{{- else if and (not .ClientStream) .ServerStream }}
+// {{.Name}} implements the adapter interface by calling the original service
+func (b *{{$serviceName}}Bridge) {{.Name}}(ctx context.Context, req models.{{.InputType}}) ([]models.{{.OutputType}}, error) {
+	return b.originalService.{{.Name}}(ctx, req)
+}
+{{- else if and .ClientStream (not .ServerStream) }}
+// {{.Name}} implements the adapter interface by calling the original service
+func (b *{{$serviceName}}Bridge) {{.Name}}(ctx context.Context, input []models.{{.InputType}}) (models.{{.OutputType}}, error) {
+	return b.originalService.{{.Name}}(ctx, input)
+}
+{{- else }}
+// {{.Name}} implements the adapter interface by calling the original service
+func (b *{{$serviceName}}Bridge) {{.Name}}(ctx context.Context, input []models.{{.InputType}}) ([]models.{{.OutputType}}, error) {
+	return b.originalService.{{.Name}}(ctx, input)
+}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

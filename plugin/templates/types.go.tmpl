@@ -1,0 +1,172 @@
+// Package adapter contains auto-generated type adapters
+// Generated from protobuf annotations - DO NOT EDIT
+package adapter
+
+import (
+{{- range .PackageImports }}
+	"{{.}}"
+{{- end }}
+{{- if .ProtobufPackage }}
+	{{.ProtobufAlias}} "{{.ProtobufPackage}}"
+{{- end }}
+)
+
+{{- range .Types }}
+{{- if not .IsEnum }}
+// {{.Name}}ToProto converts {{.PackageAlias}}.{{.Name}} to protobuf *{{$.ProtobufAlias}}.{{.Name}}
+func {{.Name}}ToProto(orig {{.PackageAlias}}.{{.Name}}) *{{$.ProtobufAlias}}.{{.Name}} {
+	if IsZero{{.Name}}(orig) {
+		return nil
+	}
+
+	proto := &{{$.ProtobufAlias}}.{{.Name}}{
+{{- range .Fields }}
+{{- if and .ProtoFieldName (ne .ProtoFieldName "CreatedAt") (ne .ProtoFieldName "UpdatedAt") }}
+		{{.ProtoFieldName}}: {{.ToProtoConversion}},
+{{- end }}
+{{- end }}
+	}
+
+	return proto
+}
+
+// {{.Name}}FromProto converts protobuf *{{$.ProtobufAlias}}.{{.Name}} to {{.PackageAlias}}.{{.Name}}
+func {{.Name}}FromProto(proto *{{$.ProtobufAlias}}.{{.Name}}) {{.PackageAlias}}.{{.Name}} {
+	if proto == nil {
+		return {{.PackageAlias}}.{{.Name}}{}
+	}
+
+	orig := {{.PackageAlias}}.{{.Name}}{
+{{- range .Fields }}
+{{- if and .ProtoFieldName (ne .ProtoFieldName "CreatedAt") (ne .ProtoFieldName "UpdatedAt") }}
+		{{.GoName}}: {{.FromProtoConversion}},
+{{- end }}
+{{- end }}
+	}
+
+	return orig
+}
+
+// IsZero{{.Name}} checks if the struct is its zero value
+func IsZero{{.Name}}(v {{.PackageAlias}}.{{.Name}}) bool {
+	// Use reflection or specific field checks for zero value detection
+	// This is a simplified implementation
+	return false // TODO: Implement proper zero value detection
+}
+
+// {{.Name}}SliceToProto converts []{{.PackageAlias}}.{{.Name}} to []*{{$.ProtobufAlias}}.{{.Name}}
+func {{.Name}}SliceToProto(orig []{{.PackageAlias}}.{{.Name}}) []*{{$.ProtobufAlias}}.{{.Name}} {
+	if len(orig) == 0 {
+		return nil
+	}
+	
+	result := make([]*{{$.ProtobufAlias}}.{{.Name}}, len(orig))
+	for i, v := range orig {
+		result[i] = {{.Name}}ToProto(v)
+	}
+	return result
+}
+
+// {{.Name}}SliceFromProto converts []*{{$.ProtobufAlias}}.{{.Name}} to []{{.PackageAlias}}.{{.Name}}
+func {{.Name}}SliceFromProto(proto []*{{$.ProtobufAlias}}.{{.Name}}) []{{.PackageAlias}}.{{.Name}} {
+	if len(proto) == 0 {
+		return nil
+	}
+	
+	result := make([]{{.PackageAlias}}.{{.Name}}, len(proto))
+	for i, v := range proto {
+		result[i] = {{.Name}}FromProto(v)
+	}
+	return result
+}
+{{- else }}
+// {{.Name}}ToProto converts {{.PackageAlias}}.{{.Name}} to {{$.ProtobufAlias}}.{{.Name}}
+func {{.Name}}ToProto(orig {{.PackageAlias}}.{{.Name}}) {{$.ProtobufAlias}}.{{.Name}} {
+	return {{$.ProtobufAlias}}.{{.Name}}(orig)
+}
+
+// {{.Name}}FromProto converts {{$.ProtobufAlias}}.{{.Name}} to {{.PackageAlias}}.{{.Name}}
+func {{.Name}}FromProto(proto {{$.ProtobufAlias}}.{{.Name}}) {{.PackageAlias}}.{{.Name}} {
+	return {{.PackageAlias}}.{{.Name}}(proto)
+}
+
+// {{.Name}}SliceToProto converts []{{.PackageAlias}}.{{.Name}} to []{{$.ProtobufAlias}}.{{.Name}}
+func {{.Name}}SliceToProto(orig []{{.PackageAlias}}.{{.Name}}) []{{$.ProtobufAlias}}.{{.Name}} {
+	if len(orig) == 0 {
+		return nil
+	}
+	
+	result := make([]{{$.ProtobufAlias}}.{{.Name}}, len(orig))
+	for i, v := range orig {
+		result[i] = {{.Name}}ToProto(v)
+	}
+	return result
+}
+
+// {{.Name}}SliceFromProto converts []{{$.ProtobufAlias}}.{{.Name}} to []{{.PackageAlias}}.{{.Name}}
+func {{.Name}}SliceFromProto(proto []{{$.ProtobufAlias}}.{{.Name}}) []{{.PackageAlias}}.{{.Name}} {
+	if len(proto) == 0 {
+		return nil
+	}
+	
+	result := make([]{{.PackageAlias}}.{{.Name}}, len(proto))
+	for i, v := range proto {
+		result[i] = {{.Name}}FromProto(v)
+	}
+	return result
+}
+{{- end }}
+{{- end }}
+
+// Helper functions for pointer conversion
+func stringPtrToValue(ptr *string) string { if ptr == nil { return "" }; return *ptr }
+func valueToPtrString(val string) *string { if val == "" { return nil }; return &val }
+func int32PtrToValue(ptr *int32) int32 { if ptr == nil { return 0 }; return *ptr }
+func valueToPtrInt32(val int32) *int32 { if val == 0 { return nil }; return &val }
+func int64PtrToValue(ptr *int64) int64 { if ptr == nil { return 0 }; return *ptr }
+func valueToPtrInt64(val int64) *int64 { if val == 0 { return nil }; return &val }
+func float32PtrToValue(ptr *float32) float32 { if ptr == nil { return 0 }; return *ptr }
+func valueToPtrFloat32(val float32) *float32 { if val == 0 { return nil }; return &val }
+func float64PtrToValue(ptr *float64) float64 { if ptr == nil { return 0 }; return *ptr }
+func valueToPtrFloat64(val float64) *float64 { if val == 0 { return nil }; return &val }
+func boolPtrToValue(ptr *bool) bool { if ptr == nil { return false }; return *ptr }
+func valueToPtrBool(val bool) *bool { return &val }
+
+{{- range .MapConversions }}
+// {{.ToProtoFuncName}} converts {{.OriginalType}} to {{.ProtoType}}
+func {{.ToProtoFuncName}}(orig {{.OriginalType}}) {{.ProtoType}} {
+	if orig == nil {
+		return nil
+	}
+	result := make({{.ProtoType}}, len(orig))
+	for k, v := range orig {
+{{- if .ValueIsPointer }}
+		if v != nil {
+			result[k] = {{.ValueConversionFunc}}(*v)
+		}
+{{- else }}
+		result[k] = {{.ValueConversionFunc}}(v)
+{{- end }}
+	}
+	return result
+}
+
+// {{.FromProtoFuncName}} converts {{.ProtoType}} to {{.OriginalType}}
+func {{.FromProtoFuncName}}(proto {{.ProtoType}}) {{.OriginalType}} {
+	if proto == nil {
+		return nil
+	}
+	result := make({{.OriginalType}}, len(proto))
+	for k, v := range proto {
+{{- if .ValueIsPointer }}
+		if v != nil {
+			converted := {{.ValueFromProtoFunc}}(v)
+			result[k] = &converted
+		}
+{{- else }}
+		result[k] = {{.ValueFromProtoFunc}}(v)
+{{- end }}
+	}
+	return result
+}
+{{- end }}
