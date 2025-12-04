@@ -546,40 +546,9 @@ func (g *StubGenerator) extractTypeFromParam(param *parser.ParamInfo) string {
 	}
 
 	return typeName
-} // analyzeMethod extracts method information for service generation
-func (g *StubGenerator) analyzeMethod(method *parser.MethodInfo) *MethodInfo {
-	methodInfo := &MethodInfo{
-		Name: method.Name,
-	}
-
-	// Extract RPC information from annotations
-	for _, ann := range method.Annotations {
-		if g.isRPCAnnotation(&ann) {
-			if input, ok := ann.Params["input"]; ok {
-				methodInfo.InputType = input
-			}
-			if output, ok := ann.Params["output"]; ok {
-				methodInfo.OutputType = output
-			}
-			if clientStreaming, ok := ann.Params["client_streaming"]; ok {
-				methodInfo.ClientStream = clientStreaming == "true"
-			}
-			if serverStreaming, ok := ann.Params["server_streaming"]; ok {
-				methodInfo.ServerStream = serverStreaming == "true"
-			}
-			methodInfo.IsStreaming = methodInfo.ClientStream || methodInfo.ServerStream
-			break
-		}
-	}
-
-	return methodInfo
 }
 
 // Helper functions for annotation detection
-func (g *StubGenerator) isMessageAnnotation(ann *annotations.Annotation) bool {
-	name := strings.ToLower(ann.Name)
-	return strings.Contains(name, "message") || name == "proto.message"
-}
 
 func (g *StubGenerator) isServiceAnnotation(ann *annotations.Annotation) bool {
 	name := strings.ToLower(ann.Name)

@@ -1616,7 +1616,7 @@ func (g *Generator) generateServiceFromStruct(out *strings.Builder, structInfo *
 			return fmt.Errorf("failed to generate RPC for method %s: %w", fn.Name, err)
 		}
 
-		out.WriteString(fmt.Sprintf("  %s\n", rpcDef))
+		fmt.Fprintf(out, "  %s\n", rpcDef)
 		methodCount++
 	}
 

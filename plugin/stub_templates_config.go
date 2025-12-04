@@ -409,34 +409,34 @@ func (g *StubGenerator) resolveProtobufPackage(goPackage string) string {
 	return goPackage
 }
 
-// toPascalCase converts snake_case to PascalCase with protobuf conventions
-func (g *StubGenerator) toPascalCase(s string) string {
-	// Special handling for common cases that protoc handles differently
-	switch strings.ToLower(s) {
-	case "id":
-		return "Id" // protoc generates "Id" not "ID"
-	case "adopter_id":
-		return "AdopterId" // protoc generates "AdopterId" not "AdopterID"
-	case "created_at":
-		return "CreatedAt"
-	case "updated_at":
-		return "UpdatedAt"
-	}
+// // toPascalCase converts snake_case to PascalCase with protobuf conventions
+// func (g *StubGenerator) toPascalCase(s string) string {
+// 	// Special handling for common cases that protoc handles differently
+// 	switch strings.ToLower(s) {
+// 	case "id":
+// 		return "Id" // protoc generates "Id" not "ID"
+// 	case "adopter_id":
+// 		return "AdopterId" // protoc generates "AdopterId" not "AdopterID"
+// 	case "created_at":
+// 		return "CreatedAt"
+// 	case "updated_at":
+// 		return "UpdatedAt"
+// 	}
 
-	parts := strings.Split(s, "_")
-	result := ""
-	for i, part := range parts {
-		if len(part) > 0 {
-			if i == len(parts)-1 && strings.ToLower(part) == "id" {
-				// Last part is "id", use "Id" instead of "ID"
-				result += "Id"
-			} else {
-				result += strings.ToUpper(part[:1]) + strings.ToLower(part[1:])
-			}
-		}
-	}
-	return result
-}
+// 	parts := strings.Split(s, "_")
+// 	result := ""
+// 	for i, part := range parts {
+// 		if len(part) > 0 {
+// 			if i == len(parts)-1 && strings.ToLower(part) == "id" {
+// 				// Last part is "id", use "Id" instead of "ID"
+// 				result += "Id"
+// 			} else {
+// 				result += strings.ToUpper(part[:1]) + strings.ToLower(part[1:])
+// 			}
+// 		}
+// 	}
+// 	return result
+// }
 
 // extractJSONTag extracts field name from json struct tag
 func (g *StubGenerator) extractJSONTag(tag string) string {
