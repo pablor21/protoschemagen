@@ -5,6 +5,17 @@ set -e
 # Required branch for publishing (default: master)
 REQUIRED_BRANCH="${PUBLISH_BRANCH:-master}"
 
+# Cleanup function to restore go.mod on exit
+cleanup() {
+    if [ -f "go.mod.bak" ]; then
+        print_info "Cleaning up: restoring original go.mod..."
+        restore_go_mod
+    fi
+}
+
+# Set trap to ensure cleanup happens on exit (success or failure)
+trap cleanup EXIT
+
 # Default version increment type
 VERSION_INCREMENT="patch"
 
@@ -25,6 +36,37 @@ print_error() {
 
 print_warning() {
     echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+# Function to backup go.mod before removing replace directives
+backup_go_mod() {
+    if [ -f "go.mod" ]; then
+        cp go.mod go.mod.bak
+        print_info "Backed up go.mod to go.mod.bak"
+    fi
+}
+
+# Function to restore go.mod from backup
+restore_go_mod() {
+    if [ -f "go.mod.bak" ]; then
+        mv go.mod.bak go.mod
+        print_info "Restored go.mod from backup"
+    fi
+}
+
+# Function to remove replace directives from go.mod
+remove_replace_directives() {
+    if [ -f "go.mod" ]; then
+        print_info "Removing replace directives from go.mod for publishing..."
+        # Remove lines that start with "replace" and are followed by "=>"
+        sed -i '' '/^replace.*=>/d' go.mod
+        
+        # Update dependencies to latest versions
+        print_info "Updating dependencies to published versions..."
+        go mod tidy
+        
+        print_info "go.mod cleaned for publishing"
+    fi
 }
 
 # Function to get the latest version from git tags
@@ -158,6 +200,19 @@ if [ $? -ne 0 ]; then
     print_error "golangci-lint found issues"
     exit 1
 fi
+
+# Backup go.mod and remove replace directives for publishing
+backup_go_mod
+remove_replace_directives
+
+# Verify that the module still builds without replace directives
+print_info "Verifying build without replace directives..."
+go build ./...
+if [ $? -ne 0 ]; then
+    print_error "Build failed without replace directives. Dependencies may not be published."
+    exit 1
+fi
+print_info "✓ Build successful without replace directives"
 
 # Push current state to GitHub
 print_info "Pushing to GitHub..."
