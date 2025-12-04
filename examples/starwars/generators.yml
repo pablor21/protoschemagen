@@ -1,0 +1,20 @@
+# Extend the base protobuf configuration
+extends: generators.base.yml
+
+# Override only the specific settings for namespace generation
+plugins:
+  protobuf:
+    generation_strategy: multiple  # Generate one .proto file per namespace
+    output: "schema/{format}/{name}.proto"  # Use namespace in filename
+    output_formats:
+      - proto
+      - json-schema
+      - markdown
+      - typescript
+    generate_stubs:
+      enabled: true
+      adapter_package: "generated/adapter"
+      original_service_interface: true
+      streaming_support: true
+      registration_helpers: true
+

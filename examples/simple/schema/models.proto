@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package starwars.v1;
+
+option csharp_namespace = "StarWars.V1";
+option go_package = "github.com/coso/v1";
+
+message User {
+  int64 id = 1;
+  string username = 2;
+  string email = 3;
+}
+
+message GetUserRequest {
+  int64 id = 1;
+}
+
+message CreateUserRequest {
+  optional User user = 1;
+}
+
+message CreateUserResponse {
+  bool success = 1;
+  string message = 2;
+}
+

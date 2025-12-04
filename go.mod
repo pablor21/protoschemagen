@@ -4,7 +4,7 @@ go 1.25.4
 
 require (
 	github.com/pablor21/gonnotation v0.0.5
-	github.com/pablor21/goschemagen v0.0.3
+	github.com/pablor21/goschemagen v0.0.7
 	gopkg.in/yaml.v3 v3.0.1
 )
 

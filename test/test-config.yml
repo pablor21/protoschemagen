@@ -1,0 +1,13 @@
+packages:
+  - ./test_annotations.go
+generate:
+  - protobuf
+
+protobuf:
+  enabled: true
+  syntax: "proto3"
+  package: "test.v1"
+  output: "test_output.proto"
+  auto_number_fields: true
+  generate_service: true
+  use_comments_as_description: true

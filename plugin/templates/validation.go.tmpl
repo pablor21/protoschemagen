@@ -1,0 +1,74 @@
+// Package adapter contains auto-generated validation methods
+// Generated from protobuf validation annotations - DO NOT EDIT
+package adapter
+
+import (
+{{- range .ValidationImports }}
+	"{{.}}"
+{{- end }}
+)
+
+{{- range .Types }}
+{{- if .HasValidation }}
+// Validate{{.Name}} validates the {{.Name}} message fields
+func Validate{{.Name}}(m *{{$.ProtobufAlias}}.{{.Name}}) error {
+{{- range .ValidationRules }}
+	{{.Code}}
+{{- end }}
+	return nil
+}
+
+// ValidateAndConvert{{.Name}} validates and converts {{$.PackageAlias}}.{{.Name}} to protobuf
+func ValidateAndConvert{{.Name}}(orig {{$.PackageAlias}}.{{.Name}}) (*{{$.ProtobufAlias}}.{{.Name}}, error) {
+	// Convert to protobuf
+	proto := {{.Name}}ToProto(orig)
+	
+	// Validate
+	if err := Validate{{.Name}}(proto); err != nil {
+		return nil, err
+	}
+	
+	return proto, nil
+}
+
+// ValidateAndConvert{{.Name}}Slice validates and converts []{{$.PackageAlias}}.{{.Name}} to protobuf
+func ValidateAndConvert{{.Name}}Slice(orig []{{$.PackageAlias}}.{{.Name}}) ([]*{{$.ProtobufAlias}}.{{.Name}}, error) {
+	if len(orig) == 0 {
+		return nil, nil
+	}
+	
+	result := make([]*{{$.ProtobufAlias}}.{{.Name}}, len(orig))
+	for i, v := range orig {
+		validated, err := ValidateAndConvert{{.Name}}(v)
+		if err != nil {
+			return nil, fmt.Errorf("validation error at index %d: %w", i, err)
+		}
+		result[i] = validated
+	}
+	return result, nil
+}
+
+{{- end }}
+{{- end }}
+
+{{- if .HasAnyValidation }}
+// ValidationError represents a validation error with field context
+type ValidationError struct {
+	Field   string
+	Message string
+	Value   interface{}
+}
+
+func (e ValidationError) Error() string {
+	return fmt.Sprintf("validation failed for field '%s': %s", e.Field, e.Message)
+}
+
+// NewValidationError creates a new validation error
+func NewValidationError(field, message string, value interface{}) *ValidationError {
+	return &ValidationError{
+		Field:   field,
+		Message: message,
+		Value:   value,
+	}
+}
+{{- end }}
