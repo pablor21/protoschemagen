@@ -12,6 +12,41 @@ import (
 	"github.com/pablor21/goschemagen"
 )
 
+// ProtoRPCMethod represents a parsed RPC method
+type ProtoRPCMethod struct {
+	Name       string
+	InputType  string
+	OutputType string
+	Comment    string
+	Original   interface{} // Can be *parser.MethodInfo or *parser.FunctionInfo
+}
+
+// ProtoService represents a parsed service
+type ProtoService struct {
+	Name     string
+	Comment  string
+	Methods  []ProtoRPCMethod
+	IsStruct bool
+	Original interface{} // *parser.InterfaceInfo or *parser.StructInfo
+}
+
+// ProtoMessage represents a parsed message
+type ProtoMessage struct {
+	Name     string
+	Comment  string
+	Fields   []ProtoField
+	Original *parser.StructInfo
+}
+
+// ProtoField represents a message field
+type ProtoField struct {
+	Name     string
+	Type     string
+	Number   int
+	Comment  string
+	Original *parser.FieldInfo
+}
+
 // Generator generates Protobuf schemas
 type Generator struct {
 	formatGen     *Plugin
@@ -19,6 +54,11 @@ type Generator struct {
 	fieldNumbers  map[string]int // Track field numbers per message
 	currentNumber int            // Current field number counter
 	currentFile   string         // Current file being generated (for imports)
+
+	// Parsed structured data - computed once, used everywhere
+	services []ProtoService
+	messages []ProtoMessage
+	parsed   bool // Flag to ensure we only parse once
 	// fieldProcessor *goschemagen.FieldProcessor
 }
 
@@ -40,11 +80,95 @@ func (g *Generator) getMergedKnownTypes() map[string]goschemagen.KnownTypeMappin
 	return merged
 }
 
+// parseAllData parses all services and messages once
+func (g *Generator) parseAllData() error {
+	if g.parsed {
+		return nil
+	}
+
+	// Parse services from interfaces
+	for _, iface := range g.ctx.Interfaces {
+		if g.hasServiceAnnotation(iface) {
+			service := ProtoService{
+				Name:     g.getServiceName(iface),
+				Comment:  g.getInterfaceDescription(iface),
+				IsStruct: false,
+				Original: iface,
+			}
+
+			// Parse all methods
+			for _, method := range iface.Methods {
+				rpcMethod := g.parseRPCMethod(method)
+				service.Methods = append(service.Methods, rpcMethod)
+			}
+
+			g.services = append(g.services, service)
+		}
+	}
+
+	// Parse services from structs
+	for _, structInfo := range g.ctx.Structs {
+		if g.hasServiceAnnotationForStruct(structInfo) {
+			service := ProtoService{
+				Name:     g.getServiceNameFromStruct(structInfo),
+				Comment:  g.getStructDescription(structInfo),
+				IsStruct: true,
+				Original: structInfo,
+			}
+
+			// Parse methods from functions with this struct as receiver
+			for _, fn := range g.ctx.Functions {
+				if fn.Receiver != nil && fn.Receiver.TypeName == structInfo.Name && g.hasRPCAnnotation(fn) {
+					rpcMethod := g.parseRPCMethodFromFunction(fn)
+					service.Methods = append(service.Methods, rpcMethod)
+				}
+			}
+
+			g.services = append(g.services, service)
+		}
+	}
+
+	// Parse messages from structs
+	for _, structInfo := range g.ctx.Structs {
+		if g.shouldIncludeStruct(structInfo) {
+			message := ProtoMessage{
+				Name:     structInfo.Name,
+				Comment:  g.getStructDescription(structInfo),
+				Original: structInfo,
+			}
+
+			// Parse fields
+			fieldNum := g.formatGen.config.StartFieldNumber
+			for _, field := range structInfo.Fields {
+				protoField := ProtoField{
+					Name:     g.getFieldName(field),
+					Type:     g.mapGoTypeToProto(field.Type),
+					Number:   fieldNum,
+					Comment:  g.getFieldDescription(field),
+					Original: field,
+				}
+				message.Fields = append(message.Fields, protoField)
+				fieldNum++
+			}
+
+			g.messages = append(g.messages, message)
+		}
+	}
+
+	g.parsed = true
+	return nil
+}
+
 // validate performs validation checks before generation
 func (g *Generator) Generate() ([]byte, error) {
 	var out strings.Builder
 	g.fieldNumbers = make(map[string]int)
 	g.currentNumber = g.formatGen.config.StartFieldNumber
+
+	// Parse all data once
+	if err := g.parseAllData(); err != nil {
+		return nil, fmt.Errorf("failed to parse data: %v", err)
+	}
 
 	// Run validation before generation
 	validator := NewProtoValidator(g.ctx.Logger)
@@ -1652,27 +1776,30 @@ func (g *Generator) getEnumValueName(v *parser.EnumValue, _ string) string {
 }
 
 func (g *Generator) generateServices(out *strings.Builder) error {
-	// Generate services from interfaces with @service annotation
-	for _, iface := range g.ctx.Interfaces {
-		if !g.shouldGenerateService(iface) {
-			continue
-		}
-
-		if err := g.generateService(out, iface); err != nil {
+	// Use the pre-parsed services data
+	for _, service := range g.services {
+		if err := g.generateServiceFromParsedData(out, service); err != nil {
 			return err
 		}
 	}
+	return nil
+}
 
-	// Generate services from structs with @service annotation
-	for _, structInfo := range g.ctx.Structs {
-		if !g.shouldGenerateServiceFromStruct(structInfo) {
-			continue
-		}
-
-		if err := g.generateServiceFromStruct(out, structInfo); err != nil {
-			return err
-		}
+// generateServiceFromParsedData generates service from pre-parsed data
+func (g *Generator) generateServiceFromParsedData(out *strings.Builder, service ProtoService) error {
+	// Write comment
+	if service.Comment != "" {
+		fmt.Fprintf(out, "// %s\n", service.Comment)
 	}
+
+	fmt.Fprintf(out, "service %s {\n", service.Name)
+
+	// Generate RPC methods from pre-parsed data
+	for _, method := range service.Methods {
+		fmt.Fprintf(out, "  rpc %s(%s) returns (%s);\n", method.Name, method.InputType, method.OutputType)
+	}
+
+	out.WriteString("}\n\n")
 	return nil
 }
 
@@ -1686,27 +1813,27 @@ func (g *Generator) shouldGenerateService(iface *parser.InterfaceInfo) bool {
 	return false
 }
 
-func (g *Generator) generateService(out *strings.Builder, iface *parser.InterfaceInfo) error {
-	serviceName := g.getServiceName(iface)
+// func (g *Generator) generateService(out *strings.Builder, iface *parser.InterfaceInfo) error {
+// 	serviceName := g.getServiceName(iface)
 
-	// Write comment
-	if desc := g.getInterfaceDescription(iface); desc != "" {
-		fmt.Fprintf(out, "// %s\n", desc)
-	}
+// 	// Write comment
+// 	if desc := g.getInterfaceDescription(iface); desc != "" {
+// 		fmt.Fprintf(out, "// %s\n", desc)
+// 	}
 
-	fmt.Fprintf(out, "service %s {\n", serviceName)
+// 	fmt.Fprintf(out, "service %s {\n", serviceName)
 
-	// Generate RPC methods from interface methods
-	for _, method := range iface.Methods {
-		rpcLine := g.generateRPC(method)
-		if rpcLine != "" {
-			fmt.Fprintf(out, "  %s\n", rpcLine)
-		}
-	}
+// 	// Generate RPC methods from interface methods
+// 	for _, method := range iface.Methods {
+// 		rpcLine := g.generateRPC(method)
+// 		if rpcLine != "" {
+// 			fmt.Fprintf(out, "  %s\n", rpcLine)
+// 		}
+// 	}
 
-	out.WriteString("}\n\n")
-	return nil
-}
+// 	out.WriteString("}\n\n")
+// 	return nil
+// }
 
 func (g *Generator) getServiceName(iface *parser.InterfaceInfo) string {
 	for _, ann := range iface.Annotations {
@@ -1720,99 +1847,115 @@ func (g *Generator) getServiceName(iface *parser.InterfaceInfo) string {
 	return iface.Name
 }
 
-func (g *Generator) generateRPC(method *parser.MethodInfo) string {
-	// Get RPC name
-	rpcName := method.Name
+// func (g *Generator) generateRPC(method *parser.MethodInfo) string {
+// 	// Get RPC name
+// 	rpcName := method.Name
 
-	// Get input/output types from function signature
-	inputType := "google.protobuf.Empty"
-	outputType := "google.protobuf.Empty"
+// 	// Get input/output types from function signature
+// 	inputType := "google.protobuf.Empty"
+// 	outputType := "google.protobuf.Empty"
 
-	if len(method.Params) > 0 {
-		inputType = g.getGoTypeName(method.Params[0].Type)
-	}
+// 	// Find first non-context parameter as input type
+// 	for _, param := range method.Params {
+// 		paramType := g.getGoTypeName(param.Type)
+// 		// Skip context.Context parameters (common in Go gRPC services)
+// 		if paramType == "context.Context" || paramType == "*context.Context" {
+// 			continue
+// 		}
+// 		inputType = paramType
+// 		break
+// 	}
 
-	if len(method.Results) > 0 {
-		outputType = g.getGoTypeName(method.Results[0].Type)
-	}
+// 	// Find first non-error result as output type
+// 	for _, result := range method.Results {
+// 		resultType := g.getGoTypeName(result.Type)
+// 		// Skip error return types (common in Go functions)
+// 		if resultType == "error" {
+// 			continue
+// 		}
+// 		outputType = resultType
+// 		break
+// 	}
 
-	// Check for @rpc annotation overrides
-	for _, ann := range method.Annotations {
-		name := strings.ToLower(ann.Name)
-		if name == "rpc" || strings.HasSuffix(name, ".rpc") {
-			if custom := ann.Params["name"]; custom != "" {
-				rpcName = custom
-			}
-			if custom := ann.Params["input"]; custom != "" {
-				inputType = custom
-			}
-			if custom := ann.Params["output"]; custom != "" {
-				outputType = custom
-			}
-		}
-	}
+// 	// Check for @rpc annotation overrides
+// 	for _, ann := range method.Annotations {
+// 		name := strings.ToLower(ann.Name)
+// 		if name == "rpc" || strings.HasSuffix(name, ".rpc") {
+// 			if custom := ann.Params["name"]; custom != "" {
+// 				rpcName = custom
+// 			}
+// 			if custom := ann.Params["input"]; custom != "" {
+// 				inputType = custom
+// 			}
+// 			if custom := ann.Params["output"]; custom != "" {
+// 				outputType = custom
+// 			}
+// 		}
+// 	}
 
-	// Handle streaming
-	inputStream := ""
-	outputStream := ""
+// 	// Handle streaming
+// 	inputStream := ""
+// 	outputStream := ""
 
-	for _, ann := range method.Annotations {
-		name := strings.ToLower(ann.Name)
-		if name == "rpc" || strings.HasSuffix(name, ".rpc") {
-			if ann.Params["client_streaming"] == "true" {
-				inputStream = "stream "
-			}
-			if ann.Params["server_streaming"] == "true" {
-				outputStream = "stream "
-			}
-		}
-	}
+// 	for _, ann := range method.Annotations {
+// 		name := strings.ToLower(ann.Name)
+// 		if name == "rpc" || strings.HasSuffix(name, ".rpc") {
+// 			if ann.Params["client_streaming"] == "true" {
+// 				inputStream = "stream "
+// 			}
+// 			if ann.Params["server_streaming"] == "true" {
+// 				outputStream = "stream "
+// 			}
+// 		}
+// 	}
 
-	return fmt.Sprintf("rpc %s(%s%s) returns (%s%s);", rpcName, inputStream, inputType, outputStream, outputType)
-}
+// 	return fmt.Sprintf("rpc %s(%s%s) returns (%s%s);", rpcName, inputStream, inputType, outputStream, outputType)
+// }
 
-// shouldGenerateServiceFromStruct checks if a struct should be treated as a service
-func (g *Generator) shouldGenerateServiceFromStruct(structInfo *parser.StructInfo) bool {
-	for _, ann := range structInfo.Annotations {
-		name := strings.ToLower(ann.Name)
-		if name == "service" || strings.HasSuffix(name, ".service") {
-			return true
-		}
-	}
-	return false
-}
+// // shouldGenerateServiceFromStruct checks if a struct should be treated as a service
+// func (g *Generator) shouldGenerateServiceFromStruct(structInfo *parser.StructInfo) bool {
+// 	for _, ann := range structInfo.Annotations {
+// 		name := strings.ToLower(ann.Name)
+// 		if name == "service" || strings.HasSuffix(name, ".service") {
+// 			return true
+// 		}
+// 	}
+// 	return false
+// }
 
-// generateServiceFromStruct generates a protobuf service from a struct with annotated methods
-func (g *Generator) generateServiceFromStruct(out *strings.Builder, structInfo *parser.StructInfo) error {
-	serviceName := g.getServiceNameFromStruct(structInfo)
+// // generateServiceFromStruct generates a protobuf service from a struct with annotated methods
+// func (g *Generator) generateServiceFromStruct(out *strings.Builder, structInfo *parser.StructInfo) error {
+// 	serviceName := g.getServiceNameFromStruct(structInfo)
 
-	fmt.Fprintf(out, "\nservice %s {\n", serviceName)
+// 	fmt.Fprintf(out, "\nservice %s {\n", serviceName)
 
-	methodCount := 0
-	// Look for annotated methods in the Functions list
-	for _, fn := range g.ctx.Functions {
-		// Check if this function is a method of our struct
-		if !g.isStructMethod(fn, structInfo) {
-			continue
-		}
+// 	methodCount := 0
+// 	// Look for annotated methods in the Functions list
+// 	for _, fn := range g.ctx.Functions {
+// 		// Check if this function is a method of our struct
+// 		if !g.isStructMethod(fn, structInfo) {
+// 			continue
+// 		}
 
-		// Check if this method has @rpc annotation
-		if !g.isRPCMethod(fn) {
-			continue
-		}
+// 		// Check if this method has @rpc annotation
+// 		if !g.isRPCMethod(fn) {
+// 			continue
+// 		}
 
-		rpcDef, err := g.generateRPCFromFunction(fn)
-		if err != nil {
-			return fmt.Errorf("failed to generate RPC for method %s: %w", fn.Name, err)
-		}
+// 		rpcDef, err := g.generateRPCFromFunction(fn)
+// 		if err != nil {
+// 			return fmt.Errorf("failed to generate RPC for method %s: %w", fn.Name, err)
+// 		}
 
-		fmt.Fprintf(out, "  %s\n", rpcDef)
-		methodCount++
-	}
+// 		fmt.Fprintf(out, "  %s\n", rpcDef)
+// 		methodCount++
+// 	}
 
-	out.WriteString("}\n")
-	return nil
-} // getServiceNameFromStruct extracts the service name from struct annotations
+// 	out.WriteString("}\n")
+// 	return nil
+// }
+
+// getServiceNameFromStruct extracts the service name from struct annotations
 func (g *Generator) getServiceNameFromStruct(structInfo *parser.StructInfo) string {
 	for _, ann := range structInfo.Annotations {
 		name := strings.ToLower(ann.Name)
@@ -1825,70 +1968,70 @@ func (g *Generator) getServiceNameFromStruct(structInfo *parser.StructInfo) stri
 	return structInfo.Name
 }
 
-// isStructMethod checks if a function is a method of the given struct
-func (g *Generator) isStructMethod(fn *parser.FunctionInfo, structInfo *parser.StructInfo) bool {
-	// Check if function has a receiver that matches our struct
-	if fn.Receiver == nil {
-		return false
-	}
+// // isStructMethod checks if a function is a method of the given struct
+// func (g *Generator) isStructMethod(fn *parser.FunctionInfo, structInfo *parser.StructInfo) bool {
+// 	// Check if function has a receiver that matches our struct
+// 	if fn.Receiver == nil {
+// 		return false
+// 	}
 
-	// Get the receiver type name
-	receiverType := fn.Receiver.TypeName
+// 	// Get the receiver type name
+// 	receiverType := fn.Receiver.TypeName
 
-	return receiverType == structInfo.Name
-}
+// 	return receiverType == structInfo.Name
+// }
 
-// isRPCMethod checks if a function has @rpc annotation
-func (g *Generator) isRPCMethod(fn *parser.FunctionInfo) bool {
-	for _, ann := range fn.Annotations {
-		name := strings.ToLower(ann.Name)
-		if name == "rpc" || strings.HasSuffix(name, ".rpc") {
-			return true
-		}
-	}
-	return false
-}
+// // isRPCMethod checks if a function has @rpc annotation
+// func (g *Generator) isRPCMethod(fn *parser.FunctionInfo) bool {
+// 	for _, ann := range fn.Annotations {
+// 		name := strings.ToLower(ann.Name)
+// 		if name == "rpc" || strings.HasSuffix(name, ".rpc") {
+// 			return true
+// 		}
+// 	}
+// 	return false
+// }
 
-// generateRPCFromFunction generates an RPC definition from a function
-func (g *Generator) generateRPCFromFunction(fn *parser.FunctionInfo) (string, error) {
-	rpcName := fn.Name
-	inputType := "google.protobuf.Empty"
-	outputType := "google.protobuf.Empty"
+// // generateRPCFromFunction generates an RPC definition from a function
+// func (g *Generator) generateRPCFromFunction(fn *parser.FunctionInfo) (string, error) {
+// 	rpcName := fn.Name
+// 	inputType := "google.protobuf.Empty"
+// 	outputType := "google.protobuf.Empty"
 
-	// Extract RPC details from annotations
-	for _, ann := range fn.Annotations {
-		name := strings.ToLower(ann.Name)
-		if name == "rpc" || strings.HasSuffix(name, ".rpc") {
-			if custom := ann.Params["name"]; custom != "" {
-				rpcName = custom
-			}
-			if custom := ann.Params["input"]; custom != "" {
-				inputType = custom
-			}
-			if custom := ann.Params["output"]; custom != "" {
-				outputType = custom
-			}
-		}
-	}
+// 	// Extract RPC details from annotations
+// 	for _, ann := range fn.Annotations {
+// 		name := strings.ToLower(ann.Name)
+// 		if name == "rpc" || strings.HasSuffix(name, ".rpc") {
+// 			if custom := ann.Params["name"]; custom != "" {
+// 				rpcName = custom
+// 			}
+// 			if custom := ann.Params["input"]; custom != "" {
+// 				inputType = custom
+// 			}
+// 			if custom := ann.Params["output"]; custom != "" {
+// 				outputType = custom
+// 			}
+// 		}
+// 	}
 
-	// Handle streaming
-	inputStream := ""
-	outputStream := ""
+// 	// Handle streaming
+// 	inputStream := ""
+// 	outputStream := ""
 
-	for _, ann := range fn.Annotations {
-		name := strings.ToLower(ann.Name)
-		if name == "rpc" || strings.HasSuffix(name, ".rpc") {
-			if ann.Params["client_streaming"] == "true" {
-				inputStream = "stream "
-			}
-			if ann.Params["server_streaming"] == "true" {
-				outputStream = "stream "
-			}
-		}
-	}
+// 	for _, ann := range fn.Annotations {
+// 		name := strings.ToLower(ann.Name)
+// 		if name == "rpc" || strings.HasSuffix(name, ".rpc") {
+// 			if ann.Params["client_streaming"] == "true" {
+// 				inputStream = "stream "
+// 			}
+// 			if ann.Params["server_streaming"] == "true" {
+// 				outputStream = "stream "
+// 			}
+// 		}
+// 	}
 
-	return fmt.Sprintf("rpc %s(%s%s) returns (%s%s);", rpcName, inputStream, inputType, outputStream, outputType), nil
-}
+// 	return fmt.Sprintf("rpc %s(%s%s) returns (%s%s);", rpcName, inputStream, inputType, outputStream, outputType), nil
+// }
 
 // getCurrentFileName gets the current file being generated (used for imports)
 func (g *Generator) getCurrentFileName() string {
@@ -2145,4 +2288,174 @@ func (g *Generator) toSnakeCase(s string) string {
 		result.WriteRune(r)
 	}
 	return strings.ToLower(result.String())
+}
+
+// parseRPCMethod parses a method from interface into ProtoRPCMethod
+func (g *Generator) parseRPCMethod(method *parser.MethodInfo) ProtoRPCMethod {
+	// Get input/output types from function signature
+	inputType := "google.protobuf.Empty"
+	outputType := "google.protobuf.Empty"
+
+	// Find first non-context parameter as input type
+	for _, param := range method.Params {
+		paramType := g.getGoTypeName(param.Type)
+		// Skip context.Context parameters (common in Go gRPC services)
+		if paramType == "context.Context" || paramType == "*context.Context" {
+			continue
+		}
+		inputType = paramType
+		break
+	}
+
+	// Find first non-error result as output type
+	for _, result := range method.Results {
+		resultType := g.getGoTypeName(result.Type)
+		// Skip error return types (common in Go functions)
+		if resultType == "error" {
+			continue
+		}
+		outputType = resultType
+		break
+	}
+
+	return ProtoRPCMethod{
+		Name:       method.Name,
+		InputType:  inputType,
+		OutputType: outputType,
+		Comment:    g.getMethodDescription(method),
+		Original:   method,
+	}
+}
+
+// parseRPCMethodFromFunction parses a method from function into ProtoRPCMethod
+func (g *Generator) parseRPCMethodFromFunction(fn *parser.FunctionInfo) ProtoRPCMethod {
+	// Convert function to method-like structure
+	inputType := "google.protobuf.Empty"
+	outputType := "google.protobuf.Empty"
+
+	// Find first non-context parameter as input type (skip receiver)
+	for _, param := range fn.Params {
+		paramType := g.getGoTypeName(param.Type)
+		// Skip context.Context parameters
+		if paramType == "context.Context" || paramType == "*context.Context" {
+			continue
+		}
+		inputType = paramType
+		break
+	}
+
+	// Find first non-error result as output type
+	for _, result := range fn.Results {
+		resultType := g.getGoTypeName(result.Type)
+		// Skip error return types
+		if resultType == "error" {
+			continue
+		}
+		outputType = resultType
+		break
+	}
+
+	return ProtoRPCMethod{
+		Name:       fn.Name,
+		InputType:  inputType,
+		OutputType: outputType,
+		Comment:    g.getFunctionDescription(fn),
+		Original:   fn,
+	}
+}
+
+// hasServiceAnnotation checks if interface has service annotation
+func (g *Generator) hasServiceAnnotation(iface *parser.InterfaceInfo) bool {
+	for _, ann := range iface.Annotations {
+		name := strings.ToLower(ann.Name)
+		if name == "service" || strings.HasSuffix(name, ".service") {
+			return true
+		}
+	}
+	return false
+}
+
+// hasServiceAnnotationForStruct checks if struct has service annotation
+func (g *Generator) hasServiceAnnotationForStruct(structInfo *parser.StructInfo) bool {
+	for _, ann := range structInfo.Annotations {
+		name := strings.ToLower(ann.Name)
+		if name == "service" || strings.HasSuffix(name, ".service") {
+			return true
+		}
+	}
+	return false
+}
+
+// hasRPCAnnotation checks if function has RPC annotation
+func (g *Generator) hasRPCAnnotation(fn *parser.FunctionInfo) bool {
+	for _, ann := range fn.Annotations {
+		name := strings.ToLower(ann.Name)
+		if name == "rpc" || strings.HasSuffix(name, ".rpc") {
+			return true
+		}
+	}
+	return false
+}
+
+// shouldIncludeStruct determines if struct should be included as message
+func (g *Generator) shouldIncludeStruct(structInfo *parser.StructInfo) bool {
+	// Include if it has annotations or is referenced by services
+	if len(structInfo.Annotations) > 0 {
+		return true
+	}
+
+	// Include if referenced by any parsed service method
+	for _, service := range g.services {
+		for _, method := range service.Methods {
+			if method.InputType == structInfo.Name || method.OutputType == structInfo.Name {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// getMethodDescription gets description from method
+func (g *Generator) getMethodDescription(method *parser.MethodInfo) string {
+	// MethodInfo doesn't have Comment field, try to extract from annotations
+	for _, ann := range method.Annotations {
+		if desc, exists := ann.GetParamValue("description"); exists {
+			return desc
+		}
+	}
+	return ""
+}
+
+// getFunctionDescription gets description from function
+func (g *Generator) getFunctionDescription(fn *parser.FunctionInfo) string {
+	// FunctionInfo doesn't have Comment field, try to extract from annotations
+	for _, ann := range fn.Annotations {
+		if desc, exists := ann.GetParamValue("description"); exists {
+			return desc
+		}
+	}
+	return ""
+}
+
+// GetParsedServices returns the pre-parsed services for use by other components
+func (g *Generator) GetParsedServices() []ProtoService {
+	if !g.parsed {
+		err := g.parseAllData() // Ensure data is parsed
+		if err != nil {
+			panic(err)
+		}
+	}
+	return g.services
+}
+
+// GetParsedMessages returns the pre-parsed messages for use by other components
+func (g *Generator) GetParsedMessages() []ProtoMessage {
+	if !g.parsed {
+		err := g.parseAllData() // Ensure data is parsed
+		if err != nil {
+			panic(err)
+		}
+	}
+	return g.messages
 }

@@ -22,6 +22,9 @@ type StubGenerator struct {
 	protoTypes      map[string]*TypeInfo
 	services        []*ServiceInfo
 	templateManager *TemplateManager
+
+	// Reference to main generator for parsed data
+	mainGenerator *Generator
 }
 
 // TypeInfo holds information about a type for mapping
@@ -73,7 +76,7 @@ type MethodInfo struct {
 }
 
 // NewStubGenerator creates a new stub generator
-func NewStubGenerator(config *StubConfig, pluginConfig *Config, ctx *goschemagen.GenerationContext) (*StubGenerator, error) {
+func NewStubGenerator(config *StubConfig, pluginConfig *Config, ctx *goschemagen.GenerationContext, mainGen *Generator) (*StubGenerator, error) {
 	generator := &StubGenerator{
 		config:        config,
 		pluginConfig:  pluginConfig,
@@ -81,6 +84,7 @@ func NewStubGenerator(config *StubConfig, pluginConfig *Config, ctx *goschemagen
 		originalTypes: make(map[string]*TypeInfo),
 		protoTypes:    make(map[string]*TypeInfo),
 		services:      make([]*ServiceInfo, 0),
+		mainGenerator: mainGen,
 	}
 
 	// Initialize template manager
@@ -252,45 +256,31 @@ func (g *StubGenerator) analyzeOriginalTypes() error {
 		g.ctx.Logger.Debug(fmt.Sprintf("Added enum for conversion: %s", typeInfo.Name))
 	}
 
-	// Analyze interfaces for services
-	for _, intfInfo := range g.ctx.Interfaces {
-		for _, ann := range intfInfo.Annotations {
-			if g.isServiceAnnotation(&ann) {
-				serviceInfo := &ServiceInfo{
-					Name:     intfInfo.Name,
-					Package:  intfInfo.PackagePath,
-					FullName: fmt.Sprintf("%s.%s", intfInfo.PackagePath, intfInfo.Name),
-					Methods:  make([]*MethodInfo, 0),
-					IsStruct: false, // This is an interface
-				}
-
-				// Use unified method detection from Functions list
-				g.addServiceMethods(serviceInfo, intfInfo.Name)
-				g.services = append(g.services, serviceInfo)
-				break
-			}
+	// Use pre-parsed services from main generator instead of re-parsing
+	parsedServices := g.mainGenerator.GetParsedServices()
+	for _, protoService := range parsedServices {
+		serviceInfo := &ServiceInfo{
+			Name:     protoService.Name,
+			Package:  "", // Will be filled from context
+			FullName: protoService.Name,
+			Methods:  make([]*MethodInfo, 0),
+			IsStruct: protoService.IsStruct,
 		}
-	}
 
-	// Analyze structs for services (concrete struct services)
-	for _, structInfo := range g.ctx.Structs {
-		for _, ann := range structInfo.Annotations {
-			if g.isServiceAnnotation(&ann) {
-				serviceInfo := &ServiceInfo{
-					Name:     structInfo.Name,
-					Package:  structInfo.PackagePath,
-					FullName: fmt.Sprintf("%s.%s", structInfo.PackagePath, structInfo.Name),
-					Methods:  make([]*MethodInfo, 0),
-					IsStruct: true, // This is a concrete struct
-				}
-
-				// Use unified method detection from Functions list
-				g.addServiceMethods(serviceInfo, structInfo.Name)
-				g.services = append(g.services, serviceInfo)
-				g.ctx.Logger.Debug(fmt.Sprintf("Added service %s with %d methods", structInfo.Name, len(serviceInfo.Methods)))
-				break
+		// Convert proto methods to stub methods
+		for _, protoMethod := range protoService.Methods {
+			methodInfo := &MethodInfo{
+				Name:         protoMethod.Name,
+				InputType:    protoMethod.InputType,
+				OutputType:   protoMethod.OutputType,
+				IsStreaming:  false, // TODO: Add streaming support
+				ClientStream: false,
+				ServerStream: false,
 			}
+			serviceInfo.Methods = append(serviceInfo.Methods, methodInfo)
 		}
+
+		g.services = append(g.services, serviceInfo)
 	}
 
 	// Analyze enums
@@ -361,192 +351,203 @@ func (g *StubGenerator) analyzeField(field *parser.FieldInfo) *FieldInfo {
 	return fieldInfo
 }
 
-// addServiceMethods adds methods to a service from the Functions list
-// This works for both interface and struct services
-func (g *StubGenerator) addServiceMethods(serviceInfo *ServiceInfo, serviceName string) {
-	if !serviceInfo.IsStruct {
-		// For interface services, get methods from the interface definition
-		for _, intfInfo := range g.ctx.Interfaces {
-			if intfInfo.Name == serviceName {
-				for _, method := range intfInfo.Methods {
-					if g.hasRPCAnnotationForMethod(method) {
-						methodInfo := g.createMethodInfoFromInterfaceMethod(method)
-						serviceInfo.Methods = append(serviceInfo.Methods, methodInfo)
-					}
-				}
-				break
-			}
-		}
-		return
-	}
+// // addServiceMethods adds methods to a service from the Functions list
+// // This works for both interface and struct services
+// func (g *StubGenerator) addServiceMethods(serviceInfo *ServiceInfo, serviceName string) {
+// 	if !serviceInfo.IsStruct {
+// 		// For interface services, get methods from the interface definition
+// 		for _, intfInfo := range g.ctx.Interfaces {
+// 			if intfInfo.Name == serviceName {
+// 				// If the interface itself has service annotation, include ALL methods
+// 				hasServiceAnnotation := false
+// 				for _, ann := range intfInfo.Annotations {
+// 					name := strings.ToLower(ann.Name)
+// 					if name == "proto.service" || name == "service" || strings.HasSuffix(name, ".service") {
+// 						hasServiceAnnotation = true
+// 						break
+// 					}
+// 				}
 
-	// For struct services, find all functions that belong to this service
-	g.ctx.Logger.Debug(fmt.Sprintf("Looking for methods for struct service: %s", serviceName))
-	g.ctx.Logger.Debug(fmt.Sprintf("Total functions in context: %d", len(g.ctx.Functions)))
+// 				for _, method := range intfInfo.Methods {
+// 					// Include method if interface has service annotation OR method has individual RPC annotation
+// 					if hasServiceAnnotation || g.hasRPCAnnotationForMethod(method) {
+// 						methodInfo := g.createMethodInfoFromInterfaceMethod(method)
+// 						serviceInfo.Methods = append(serviceInfo.Methods, methodInfo)
+// 					}
+// 				}
+// 				break
+// 			}
+// 		}
+// 		return
+// 	}
 
-	for _, fn := range g.ctx.Functions {
-		// Check if this function is a method of our service
-		isServiceMethod := false
+// 	// For struct services, find all functions that belong to this service
+// 	g.ctx.Logger.Debug(fmt.Sprintf("Looking for methods for struct service: %s", serviceName))
+// 	g.ctx.Logger.Debug(fmt.Sprintf("Total functions in context: %d", len(g.ctx.Functions)))
 
-		if fn.Receiver != nil {
-			g.ctx.Logger.Debug(fmt.Sprintf("Function %s has receiver: %s", fn.Name, fn.Receiver.TypeName))
-			// For struct services, check receiver type
-			if fn.Receiver.TypeName == serviceName {
-				isServiceMethod = true
-				g.ctx.Logger.Debug(fmt.Sprintf("Function %s matches service %s", fn.Name, serviceName))
-			}
-		} else {
-			g.ctx.Logger.Debug(fmt.Sprintf("Function %s has no receiver", fn.Name))
-		}
+// 	for _, fn := range g.ctx.Functions {
+// 		// Check if this function is a method of our service
+// 		isServiceMethod := false
 
-		// Skip if not a service method or doesn't have @rpc annotation
-		if !isServiceMethod {
-			g.ctx.Logger.Debug(fmt.Sprintf("Function %s is not a service method", fn.Name))
-			continue
-		}
+// 		if fn.Receiver != nil {
+// 			g.ctx.Logger.Debug(fmt.Sprintf("Function %s has receiver: %s", fn.Name, fn.Receiver.TypeName))
+// 			// For struct services, check receiver type
+// 			if fn.Receiver.TypeName == serviceName {
+// 				isServiceMethod = true
+// 				g.ctx.Logger.Debug(fmt.Sprintf("Function %s matches service %s", fn.Name, serviceName))
+// 			}
+// 		} else {
+// 			g.ctx.Logger.Debug(fmt.Sprintf("Function %s has no receiver", fn.Name))
+// 		}
 
-		// Check RPC annotation
-		hasRPC := g.hasRPCAnnotation(fn)
-		g.ctx.Logger.Debug(fmt.Sprintf("Function %s has %d annotations, RPC annotation: %v", fn.Name, len(fn.Annotations), hasRPC))
-		for i, ann := range fn.Annotations {
-			g.ctx.Logger.Debug(fmt.Sprintf("  Annotation %d: %s", i, ann.Name))
-		}
+// 		// Skip if not a service method or doesn't have @rpc annotation
+// 		if !isServiceMethod {
+// 			g.ctx.Logger.Debug(fmt.Sprintf("Function %s is not a service method", fn.Name))
+// 			continue
+// 		}
 
-		if !hasRPC {
-			g.ctx.Logger.Debug(fmt.Sprintf("Function %s has no RPC annotation", fn.Name))
-			continue
-		}
+// 		// Check RPC annotation
+// 		hasRPC := g.hasRPCAnnotation(fn)
+// 		g.ctx.Logger.Debug(fmt.Sprintf("Function %s has %d annotations, RPC annotation: %v", fn.Name, len(fn.Annotations), hasRPC))
+// 		for i, ann := range fn.Annotations {
+// 			g.ctx.Logger.Debug(fmt.Sprintf("  Annotation %d: %s", i, ann.Name))
+// 		}
 
-		// Create method info from function
-		methodInfo := g.createMethodInfoFromFunction(fn)
-		serviceInfo.Methods = append(serviceInfo.Methods, methodInfo)
-		g.ctx.Logger.Debug(fmt.Sprintf("Added method %s to service %s", methodInfo.Name, serviceName))
-	}
-}
+// 		if !hasRPC {
+// 			g.ctx.Logger.Debug(fmt.Sprintf("Function %s has no RPC annotation", fn.Name))
+// 			continue
+// 		}
 
-// hasRPCAnnotation checks if a function has @rpc annotation
-func (g *StubGenerator) hasRPCAnnotation(fn *parser.FunctionInfo) bool {
-	for _, ann := range fn.Annotations {
-		name := strings.ToLower(ann.Name)
-		if name == "rpc" || strings.HasSuffix(name, ".rpc") {
-			return true
-		}
-	}
-	return false
-}
+// 		// Create method info from function
+// 		methodInfo := g.createMethodInfoFromFunction(fn)
+// 		serviceInfo.Methods = append(serviceInfo.Methods, methodInfo)
+// 		g.ctx.Logger.Debug(fmt.Sprintf("Added method %s to service %s", methodInfo.Name, serviceName))
+// 	}
+// }
 
-// hasRPCAnnotationForMethod checks if an interface method has @rpc annotation
-func (g *StubGenerator) hasRPCAnnotationForMethod(method *parser.MethodInfo) bool {
-	for _, ann := range method.Annotations {
-		name := strings.ToLower(ann.Name)
-		if name == "rpc" || strings.HasSuffix(name, ".rpc") {
-			return true
-		}
-	}
-	return false
-}
+// // hasRPCAnnotation checks if a function has @rpc annotation
+// func (g *StubGenerator) hasRPCAnnotation(fn *parser.FunctionInfo) bool {
+// 	for _, ann := range fn.Annotations {
+// 		name := strings.ToLower(ann.Name)
+// 		if name == "rpc" || strings.HasSuffix(name, ".rpc") {
+// 			return true
+// 		}
+// 	}
+// 	return false
+// }
 
-// createMethodInfoFromInterfaceMethod creates MethodInfo from interface method
-func (g *StubGenerator) createMethodInfoFromInterfaceMethod(method *parser.MethodInfo) *MethodInfo {
-	methodInfo := &MethodInfo{
-		Name: method.Name,
-	}
+// // hasRPCAnnotationForMethod checks if an interface method has @rpc annotation
+// func (g *StubGenerator) hasRPCAnnotationForMethod(method *parser.MethodInfo) bool {
+// 	for _, ann := range method.Annotations {
+// 		name := strings.ToLower(ann.Name)
+// 		if name == "rpc" || strings.HasSuffix(name, ".rpc") {
+// 			return true
+// 		}
+// 	}
+// 	return false
+// }
 
-	// Extract RPC information from annotations
-	for _, ann := range method.Annotations {
-		if g.isRPCAnnotation(&ann) {
-			if input, ok := ann.Params["input"]; ok {
-				methodInfo.InputType = input
-			}
-			if output, ok := ann.Params["output"]; ok {
-				methodInfo.OutputType = output
-			}
-			if clientStreaming, ok := ann.Params["client_streaming"]; ok {
-				methodInfo.ClientStream = clientStreaming == "true"
-			}
-			if serverStreaming, ok := ann.Params["server_streaming"]; ok {
-				methodInfo.ServerStream = serverStreaming == "true"
-			}
-			methodInfo.IsStreaming = methodInfo.ClientStream || methodInfo.ServerStream
-			break
-		}
-	}
+// // createMethodInfoFromInterfaceMethod creates MethodInfo from interface method
+// func (g *StubGenerator) createMethodInfoFromInterfaceMethod(method *parser.MethodInfo) *MethodInfo {
+// 	methodInfo := &MethodInfo{
+// 		Name: method.Name,
+// 	}
 
-	return methodInfo
-}
+// 	// Extract RPC information from annotations
+// 	for _, ann := range method.Annotations {
+// 		if g.isRPCAnnotation(&ann) {
+// 			if input, ok := ann.Params["input"]; ok {
+// 				methodInfo.InputType = input
+// 			}
+// 			if output, ok := ann.Params["output"]; ok {
+// 				methodInfo.OutputType = output
+// 			}
+// 			if clientStreaming, ok := ann.Params["client_streaming"]; ok {
+// 				methodInfo.ClientStream = clientStreaming == "true"
+// 			}
+// 			if serverStreaming, ok := ann.Params["server_streaming"]; ok {
+// 				methodInfo.ServerStream = serverStreaming == "true"
+// 			}
+// 			methodInfo.IsStreaming = methodInfo.ClientStream || methodInfo.ServerStream
+// 			break
+// 		}
+// 	}
 
-// createMethodInfoFromFunction creates MethodInfo from function
-func (g *StubGenerator) createMethodInfoFromFunction(fn *parser.FunctionInfo) *MethodInfo {
-	methodInfo := &MethodInfo{
-		Name: fn.Name,
-	}
+// 	return methodInfo
+// }
 
-	// Extract input and output types from function signature
-	// Input type (skip context.Context, take the actual request parameter)
-	for i, param := range fn.Params {
-		typeUtils := parser.NewTypeUtils()
-		paramType := typeUtils.GetTypeName(param.Type)
+// // createMethodInfoFromFunction creates MethodInfo from function
+// func (g *StubGenerator) createMethodInfoFromFunction(fn *parser.FunctionInfo) *MethodInfo {
+// 	methodInfo := &MethodInfo{
+// 		Name: fn.Name,
+// 	}
 
-		// Skip context.Context parameter (appears as just "Context" from GetTypeName)
-		// Also skip the first parameter by default (usually context)
-		if i == 0 || paramType == "Context" || strings.Contains(paramType, "context.Context") {
-			continue
-		}
+// 	// Extract input and output types from function signature
+// 	// Input type (skip context.Context, take the actual request parameter)
+// 	for i, param := range fn.Params {
+// 		typeUtils := parser.NewTypeUtils()
+// 		paramType := typeUtils.GetTypeName(param.Type)
 
-		methodInfo.InputType = g.extractTypeFromParam(param)
-		break
-	}
+// 		// Skip context.Context parameter (appears as just "Context" from GetTypeName)
+// 		// Also skip the first parameter by default (usually context)
+// 		if i == 0 || paramType == "Context" || strings.Contains(paramType, "context.Context") {
+// 			continue
+// 		}
 
-	// Output type (first return value that's not error)
-	for _, result := range fn.Results {
-		typeUtils := parser.NewTypeUtils()
-		resultType := typeUtils.GetTypeName(result.Type)
-		if resultType != "error" {
-			methodInfo.OutputType = g.extractTypeFromParam(result)
-			break
-		}
-	}
+// 		methodInfo.InputType = g.extractTypeFromParam(param)
+// 		break
+// 	}
 
-	// Extract RPC information from annotations
-	for _, ann := range fn.Annotations {
-		if g.isRPCAnnotation(&ann) {
-			if input, ok := ann.Params["input"]; ok {
-				methodInfo.InputType = input
-			}
-			if output, ok := ann.Params["output"]; ok {
-				methodInfo.OutputType = output
-			}
-			if clientStreaming, ok := ann.Params["client_streaming"]; ok {
-				methodInfo.ClientStream = clientStreaming == "true"
-			}
-			if serverStreaming, ok := ann.Params["server_streaming"]; ok {
-				methodInfo.ServerStream = serverStreaming == "true"
-			}
-			methodInfo.IsStreaming = methodInfo.ClientStream || methodInfo.ServerStream
-			break
-		}
-	}
+// 	// Output type (first return value that's not error)
+// 	for _, result := range fn.Results {
+// 		typeUtils := parser.NewTypeUtils()
+// 		resultType := typeUtils.GetTypeName(result.Type)
+// 		if resultType != "error" {
+// 			methodInfo.OutputType = g.extractTypeFromParam(result)
+// 			break
+// 		}
+// 	}
 
-	return methodInfo
-}
+// 	// Extract RPC information from annotations
+// 	for _, ann := range fn.Annotations {
+// 		if g.isRPCAnnotation(&ann) {
+// 			if input, ok := ann.Params["input"]; ok {
+// 				methodInfo.InputType = input
+// 			}
+// 			if output, ok := ann.Params["output"]; ok {
+// 				methodInfo.OutputType = output
+// 			}
+// 			if clientStreaming, ok := ann.Params["client_streaming"]; ok {
+// 				methodInfo.ClientStream = clientStreaming == "true"
+// 			}
+// 			if serverStreaming, ok := ann.Params["server_streaming"]; ok {
+// 				methodInfo.ServerStream = serverStreaming == "true"
+// 			}
+// 			methodInfo.IsStreaming = methodInfo.ClientStream || methodInfo.ServerStream
+// 			break
+// 		}
+// 	}
 
-// extractTypeFromParam extracts the clean type name from a parameter
-func (g *StubGenerator) extractTypeFromParam(param *parser.ParamInfo) string {
-	if param == nil {
-		return ""
-	}
+// 	return methodInfo
+// }
 
-	// Use TypeUtils to convert ast.Expr to string
-	typeUtils := parser.NewTypeUtils()
-	typeName := typeUtils.GetTypeName(param.Type)
+// // extractTypeFromParam extracts the clean type name from a parameter
+// func (g *StubGenerator) extractTypeFromParam(param *parser.ParamInfo) string {
+// 	if param == nil {
+// 		return ""
+// 	}
 
-	// Remove package prefix if it exists to get clean type name
-	if dotIndex := strings.LastIndex(typeName, "."); dotIndex >= 0 {
-		typeName = typeName[dotIndex+1:]
-	}
+// 	// Use TypeUtils to convert ast.Expr to string
+// 	typeUtils := parser.NewTypeUtils()
+// 	typeName := typeUtils.GetTypeName(param.Type)
 
-	return typeName
-}
+// 	// Remove package prefix if it exists to get clean type name
+// 	if dotIndex := strings.LastIndex(typeName, "."); dotIndex >= 0 {
+// 		typeName = typeName[dotIndex+1:]
+// 	}
+
+// 	return typeName
+// }
 
 // Helper functions for annotation detection
 
@@ -565,10 +566,10 @@ func (g *StubGenerator) isEnumAnnotation(ann *annotations.Annotation) bool {
 	return strings.Contains(name, "enum") || name == "proto.enum"
 }
 
-func (g *StubGenerator) isRPCAnnotation(ann *annotations.Annotation) bool {
-	name := strings.ToLower(ann.Name)
-	return strings.Contains(name, "rpc") || name == "proto.rpc"
-}
+// func (g *StubGenerator) isRPCAnnotation(ann *annotations.Annotation) bool {
+// 	name := strings.ToLower(ann.Name)
+// 	return strings.Contains(name, "rpc") || name == "proto.rpc"
+// }
 
 // Helper functions
 func (g *StubGenerator) parseInt(s string) int {

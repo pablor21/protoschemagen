@@ -107,6 +107,11 @@ func IsZero{{.Name}}(v {{.PackageAlias}}.{{.Name}}) bool {
 	if len(v.{{.GoName}}) > 0 {
 		return false
 	}
+{{- else if and (ge (len .Type) 1) (eq (slice .Type 0 1) "*") }}
+	// For pointer types, check if nil
+	if v.{{.GoName}} != nil {
+		return false
+	}
 {{- else }}
 	// For complex types, use reflection or custom logic
 	if v.{{.GoName}} != ({{.Type}}{}) {

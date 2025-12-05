@@ -40,7 +40,7 @@ func (g *Generator) GenerateMulti() (*parser.GeneratedOutput, error) {
 
 	// Generate stubs if enabled (but skip protoc for now)
 	if g.formatGen.config.GenerateStubs != nil && g.formatGen.config.GenerateStubs.Enabled {
-		stubGen, err := NewStubGenerator(g.formatGen.config.GenerateStubs, g.formatGen.config, g.ctx)
+		stubGen, err := NewStubGenerator(g.formatGen.config.GenerateStubs, g.formatGen.config, g.ctx, g)
 		if err != nil {
 			g.ctx.Logger.Info(fmt.Sprintf("Failed to create stub generator: %v", err))
 		} else {

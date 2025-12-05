@@ -6,71 +6,6 @@ import (
 	"github.com/coso/models"
 	pb "github.com/coso/generated/proto/v1"
 )
-// CreateUserResponseToProto converts models.CreateUserResponse to protobuf *pb.CreateUserResponse
-func CreateUserResponseToProto(orig models.CreateUserResponse) *pb.CreateUserResponse {
-	if IsZeroCreateUserResponse(orig) {
-		return nil
-	}
-
-	proto := &pb.CreateUserResponse{
-		Success: orig.Success,
-		Message: orig.Message,
-	}
-
-	return proto
-}
-
-// CreateUserResponseFromProto converts protobuf *pb.CreateUserResponse to models.CreateUserResponse
-func CreateUserResponseFromProto(proto *pb.CreateUserResponse) models.CreateUserResponse {
-	if proto == nil {
-		return models.CreateUserResponse{}
-	}
-
-	orig := models.CreateUserResponse{
-		Success: proto.Success,
-		Message: proto.Message,
-	}
-
-	return orig
-}
-
-// IsZeroCreateUserResponse checks if the struct is its zero value
-func IsZeroCreateUserResponse(v models.CreateUserResponse) bool {
-	// Check if all fields are zero values
-	if v.Success {
-		return false
-	}
-	if v.Message != "" {
-		return false
-	}
-	return true
-}
-
-// CreateUserResponseSliceToProto converts []models.CreateUserResponse to []*pb.CreateUserResponse
-func CreateUserResponseSliceToProto(orig []models.CreateUserResponse) []*pb.CreateUserResponse {
-	if len(orig) == 0 {
-		return nil
-	}
-	
-	result := make([]*pb.CreateUserResponse, len(orig))
-	for i, v := range orig {
-		result[i] = CreateUserResponseToProto(v)
-	}
-	return result
-}
-
-// CreateUserResponseSliceFromProto converts []*pb.CreateUserResponse to []models.CreateUserResponse
-func CreateUserResponseSliceFromProto(proto []*pb.CreateUserResponse) []models.CreateUserResponse {
-	if len(proto) == 0 {
-		return nil
-	}
-	
-	result := make([]models.CreateUserResponse, len(proto))
-	for i, v := range proto {
-		result[i] = CreateUserResponseFromProto(v)
-	}
-	return result
-}
 // UserToProto converts models.User to protobuf *pb.User
 func UserToProto(orig models.User) *pb.User {
 	if IsZeroUser(orig) {
@@ -230,8 +165,8 @@ func CreateUserRequestFromProto(proto *pb.CreateUserRequest) models.CreateUserRe
 // IsZeroCreateUserRequest checks if the struct is its zero value
 func IsZeroCreateUserRequest(v models.CreateUserRequest) bool {
 	// Check if all fields are zero values
-	// For complex types, use reflection or custom logic
-	if v.User != (*User{}) {
+	// For pointer types, check if nil
+	if v.User != nil {
 		return false
 	}
 	return true
@@ -262,21 +197,70 @@ func CreateUserRequestSliceFromProto(proto []*pb.CreateUserRequest) []models.Cre
 	}
 	return result
 }
-// ConvertPointerToProto_CreateUserResponse converts *models.CreateUserResponse to *pb.CreateUserResponse
-func ConvertPointerToProto_CreateUserResponse(orig *models.CreateUserResponse) *pb.CreateUserResponse {
-	if orig == nil {
+// CreateUserResponseToProto converts models.CreateUserResponse to protobuf *pb.CreateUserResponse
+func CreateUserResponseToProto(orig models.CreateUserResponse) *pb.CreateUserResponse {
+	if IsZeroCreateUserResponse(orig) {
 		return nil
 	}
-	return CreateUserResponseToProto(*orig)
+
+	proto := &pb.CreateUserResponse{
+		Success: orig.Success,
+		Message: orig.Message,
+	}
+
+	return proto
 }
 
-// ConvertPointerFromProto_CreateUserResponse converts *pb.CreateUserResponse to *models.CreateUserResponse
-func ConvertPointerFromProto_CreateUserResponse(proto *pb.CreateUserResponse) *models.CreateUserResponse {
+// CreateUserResponseFromProto converts protobuf *pb.CreateUserResponse to models.CreateUserResponse
+func CreateUserResponseFromProto(proto *pb.CreateUserResponse) models.CreateUserResponse {
 	if proto == nil {
+		return models.CreateUserResponse{}
+	}
+
+	orig := models.CreateUserResponse{
+		Success: proto.Success,
+		Message: proto.Message,
+	}
+
+	return orig
+}
+
+// IsZeroCreateUserResponse checks if the struct is its zero value
+func IsZeroCreateUserResponse(v models.CreateUserResponse) bool {
+	// Check if all fields are zero values
+	if v.Success {
+		return false
+	}
+	if v.Message != "" {
+		return false
+	}
+	return true
+}
+
+// CreateUserResponseSliceToProto converts []models.CreateUserResponse to []*pb.CreateUserResponse
+func CreateUserResponseSliceToProto(orig []models.CreateUserResponse) []*pb.CreateUserResponse {
+	if len(orig) == 0 {
 		return nil
 	}
-	result := CreateUserResponseFromProto(proto)
-	return &result
+	
+	result := make([]*pb.CreateUserResponse, len(orig))
+	for i, v := range orig {
+		result[i] = CreateUserResponseToProto(v)
+	}
+	return result
+}
+
+// CreateUserResponseSliceFromProto converts []*pb.CreateUserResponse to []models.CreateUserResponse
+func CreateUserResponseSliceFromProto(proto []*pb.CreateUserResponse) []models.CreateUserResponse {
+	if len(proto) == 0 {
+		return nil
+	}
+	
+	result := make([]models.CreateUserResponse, len(proto))
+	for i, v := range proto {
+		result[i] = CreateUserResponseFromProto(v)
+	}
+	return result
 }
 // ConvertPointerToProto_User converts *models.User to *pb.User
 func ConvertPointerToProto_User(orig *models.User) *pb.User {
@@ -324,6 +308,22 @@ func ConvertPointerFromProto_CreateUserRequest(proto *pb.CreateUserRequest) *mod
 		return nil
 	}
 	result := CreateUserRequestFromProto(proto)
+	return &result
+}
+// ConvertPointerToProto_CreateUserResponse converts *models.CreateUserResponse to *pb.CreateUserResponse
+func ConvertPointerToProto_CreateUserResponse(orig *models.CreateUserResponse) *pb.CreateUserResponse {
+	if orig == nil {
+		return nil
+	}
+	return CreateUserResponseToProto(*orig)
+}
+
+// ConvertPointerFromProto_CreateUserResponse converts *pb.CreateUserResponse to *models.CreateUserResponse
+func ConvertPointerFromProto_CreateUserResponse(proto *pb.CreateUserResponse) *models.CreateUserResponse {
+	if proto == nil {
+		return nil
+	}
+	result := CreateUserResponseFromProto(proto)
 	return &result
 }
 
