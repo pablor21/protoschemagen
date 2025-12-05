@@ -1,9 +1,5 @@
 github.com/google/go-cmp v0.6.0 h1:ofyhxvXcZhMsU5ulbFiLKl/XBFqE1GSq7atu8tAmTRI=
 github.com/google/go-cmp v0.6.0/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
-github.com/pablor21/gonnotation v0.0.5 h1:i5ELEMqkpsqmkNnDN0CrFClfhmOZn4In6iMjWG/4SCs=
-github.com/pablor21/gonnotation v0.0.5/go.mod h1:kc4HjeQbu98FDnOK9PMaTvHZbuprA1A99JuF4l6y9VU=
-github.com/pablor21/goschemagen v0.0.7 h1:S0JrQozw/ClWnYDTzDPqdFU+ZZlQkXwy6tx6YlfhV+g=
-github.com/pablor21/goschemagen v0.0.7/go.mod h1:hCLsH2cQXF+S8410hPVNECue6XsF4/rJnjQWwqVRs28=
 golang.org/x/mod v0.30.0 h1:fDEXFVZ/fmCKProc/yAXXUijritrDzahmwwefnjoPFk=
 golang.org/x/mod v0.30.0/go.mod h1:lAsf5O2EvJeSFMiBxXDki7sCgAxEUcZHXoXMKT4GJKc=
 golang.org/x/sync v0.18.0 h1:kr88TuHDroi+UVf+0hZnirlk8o8T+4MrK6mr60WkH/I=
