@@ -12,6 +12,58 @@ import (
 //go:embed templates/*.tmpl
 var embeddedTemplates embed.FS
 
+// protobufTypeName converts protobuf type names to correct Go package references
+func protobufTypeName(typeName string) string {
+	switch typeName {
+	case "google.protobuf.Int64Value":
+		return "*wrapperspb.Int64Value"
+	case "google.protobuf.Int32Value":
+		return "*wrapperspb.Int32Value"
+	case "google.protobuf.StringValue":
+		return "*wrapperspb.StringValue"
+	case "google.protobuf.BoolValue":
+		return "*wrapperspb.BoolValue"
+	case "google.protobuf.DoubleValue":
+		return "*wrapperspb.DoubleValue"
+	case "google.protobuf.FloatValue":
+		return "*wrapperspb.FloatValue"
+	case "google.protobuf.UInt64Value":
+		return "*wrapperspb.UInt64Value"
+	case "google.protobuf.UInt32Value":
+		return "*wrapperspb.UInt32Value"
+	case "google.protobuf.BytesValue":
+		return "*wrapperspb.BytesValue"
+	case "google.protobuf.Empty":
+		return "*emptypb.Empty"
+	default:
+		// For regular types, use pb. prefix
+		return "*pb." + typeName
+	}
+}
+
+// zeroValue returns the zero value for a Go type
+func zeroValue(typeName string) string {
+	switch typeName {
+	case "string":
+		return `""`
+	case "int", "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64":
+		return "0"
+	case "float32", "float64":
+		return "0.0"
+	case "bool":
+		return "false"
+	case "[]byte":
+		return "nil"
+	default:
+		// For pointer types and structs
+		if strings.HasPrefix(typeName, "*") {
+			return "nil"
+		}
+		// For struct types, use empty struct literal
+		return typeName + "{}"
+	}
+}
+
 // TemplateSource represents the source of templates
 type TemplateSource interface {
 	LoadTemplate(name string) (string, error)
@@ -112,8 +164,16 @@ func (tm *TemplateManager) GetTemplate(name string) (*template.Template, error) 
 		return nil, err
 	}
 
-	// Parse template
-	tmpl, err := template.New(name).Parse(content)
+	// Parse template with functions
+	tmpl, err := template.New(name).Funcs(template.FuncMap{
+		"hasPrefix":        strings.HasPrefix,
+		"contains":         strings.Contains,
+		"trimPrefix":       strings.TrimPrefix,
+		"toLower":          strings.ToLower,
+		"toUpper":          strings.ToUpper,
+		"protobufTypeName": protobufTypeName,
+		"zeroValue":        zeroValue,
+	}).Parse(content)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse template %s: %w", name, err)
 	}

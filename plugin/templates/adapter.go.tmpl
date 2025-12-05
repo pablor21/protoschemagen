@@ -116,18 +116,86 @@ func (a *{{$serviceName}}Adapter) {{.Name}}(req *pb.{{.InputType}}, stream pb.{{
 
 {{- else }}
 // {{.Name}} implements unary RPC
-func (a *{{$serviceName}}Adapter) {{.Name}}(ctx context.Context, req *pb.{{.InputType}}) (*pb.{{.OutputType}}, error) {
-	// Convert request
+func (a *{{$serviceName}}Adapter) {{.Name}}(ctx context.Context, req {{protobufTypeName .InputType}}) ({{protobufTypeName .OutputType}}, error) {
+	// Convert request from protobuf to original Go type
+{{- if eq .InputType "google.protobuf.Empty" }}
+	// No input parameters needed
+{{- else if hasPrefix .InputType "google.protobuf." }}
+	{{- if eq .InputType "google.protobuf.Int64Value" }}
+	goReq := req.Value  // Extract int64 from wrapper
+	{{- else if eq .InputType "google.protobuf.Int32Value" }}
+	goReq := req.Value  // Extract int32 from wrapper
+	{{- else if eq .InputType "google.protobuf.StringValue" }}
+	goReq := req.Value  // Extract string from wrapper
+	{{- else if eq .InputType "google.protobuf.BoolValue" }}
+	goReq := req.Value  // Extract bool from wrapper
+	{{- else if eq .InputType "google.protobuf.DoubleValue" }}
+	goReq := req.Value  // Extract float64 from wrapper
+	{{- else if eq .InputType "google.protobuf.FloatValue" }}
+	goReq := req.Value  // Extract float32 from wrapper
+	{{- else if eq .InputType "google.protobuf.UInt64Value" }}
+	goReq := req.Value  // Extract uint64 from wrapper
+	{{- else if eq .InputType "google.protobuf.UInt32Value" }}
+	goReq := req.Value  // Extract uint32 from wrapper
+	{{- else if eq .InputType "google.protobuf.BytesValue" }}
+	goReq := req.Value  // Extract []byte from wrapper
+	{{- else }}
+	{{- if hasPrefix .OriginalInputType "*" }}
+	goReqValue := {{.InputType}}FromProto(req)
+	goReq := &goReqValue
+	{{- else }}
 	goReq := {{.InputType}}FromProto(req)
+	{{- end }}
+	{{- end }}
+{{- else }}
+	{{- if hasPrefix .OriginalInputType "*" }}
+	goReqValue := {{.InputType}}FromProto(req)
+	goReq := &goReqValue
+	{{- else }}
+	goReq := {{.InputType}}FromProto(req)
+	{{- end }}
+{{- end }}
 	
-	// Call service method
-	result, err := a.service.{{.Name}}(ctx, goReq)
+	// Call service method with original signature
+{{- if eq .OutputType "google.protobuf.Empty" }}
+	err := a.service.{{.Name}}({{if .HasContext}}ctx{{if ne .InputType "google.protobuf.Empty"}}, {{end}}{{end}}{{if ne .InputType "google.protobuf.Empty"}}goReq{{end}})
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, nil
+{{- else }}
+	result, err := a.service.{{.Name}}({{if .HasContext}}ctx{{if ne .InputType "google.protobuf.Empty"}}, {{end}}{{end}}{{if ne .InputType "google.protobuf.Empty"}}goReq{{end}})
 	if err != nil {
 		return nil, err
 	}
 	
-	// Convert and return response
-	return {{.OutputType}}ToProto(result), nil
+	// Convert result to protobuf type
+{{- if hasPrefix .OutputType "google.protobuf." }}
+	{{- if eq .OutputType "google.protobuf.Int64Value" }}
+	return &wrapperspb.Int64Value{Value: {{if hasPrefix .OriginalOutputType "*"}}*{{end}}result}, nil
+	{{- else if eq .OutputType "google.protobuf.Int32Value" }}
+	return &wrapperspb.Int32Value{Value: {{if hasPrefix .OriginalOutputType "*"}}*{{end}}result}, nil
+	{{- else if eq .OutputType "google.protobuf.StringValue" }}
+	return &wrapperspb.StringValue{Value: {{if hasPrefix .OriginalOutputType "*"}}*{{end}}result}, nil
+	{{- else if eq .OutputType "google.protobuf.BoolValue" }}
+	return &wrapperspb.BoolValue{Value: {{if hasPrefix .OriginalOutputType "*"}}*{{end}}result}, nil
+	{{- else if eq .OutputType "google.protobuf.DoubleValue" }}
+	return &wrapperspb.DoubleValue{Value: {{if hasPrefix .OriginalOutputType "*"}}*{{end}}result}, nil
+	{{- else if eq .OutputType "google.protobuf.FloatValue" }}
+	return &wrapperspb.FloatValue{Value: {{if hasPrefix .OriginalOutputType "*"}}*{{end}}result}, nil
+	{{- else if eq .OutputType "google.protobuf.UInt64Value" }}
+	return &wrapperspb.UInt64Value{Value: {{if hasPrefix .OriginalOutputType "*"}}*{{end}}result}, nil
+	{{- else if eq .OutputType "google.protobuf.UInt32Value" }}
+	return &wrapperspb.UInt32Value{Value: {{if hasPrefix .OriginalOutputType "*"}}*{{end}}result}, nil
+	{{- else if eq .OutputType "google.protobuf.BytesValue" }}
+	return &wrapperspb.BytesValue{Value: {{if hasPrefix .OriginalOutputType "*"}}*{{end}}result}, nil
+	{{- else }}
+	return {{.OutputType}}ToProto({{if hasPrefix .OriginalOutputType "*"}}*{{end}}result), nil
+	{{- end }}
+{{- else }}
+	return {{.OutputType}}ToProto({{if hasPrefix .OriginalOutputType "*"}}*{{end}}result), nil
+{{- end }}
+{{- end }}
 }
 {{- end }}
 

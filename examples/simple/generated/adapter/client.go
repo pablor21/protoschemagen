@@ -5,6 +5,7 @@ package adapter
 import (
 	"github.com/coso/models"
 	"context"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	pb "github.com/coso/generated/proto/v1"
 	"google.golang.org/grpc"
 )
@@ -20,30 +21,28 @@ func NewUserServiceClient(conn *grpc.ClientConn) *UserServiceClient {
 	}
 }
 // GetUser calls the gRPC GetUser method using Go types
-func (c *UserServiceClient) GetUser(ctx context.Context, req models.GetUserRequest) (models.User, error) {
-	// Convert Go request to protobuf
-	protoReq := GetUserRequestToProto(req)
+func (c *UserServiceClient) GetUser(req int64) (*models.User, error) {
+	// Convert primitive to wrapper
+	protoReq := &wrapperspb.Int64Value{Value: req}
 
 	// Call gRPC method
-	protoResp, err := c.client.GetUser(ctx, protoReq)
+	protoResp, err := c.client.GetUser(context.Background(), protoReq)
 	if err != nil {
-		return models.User{}, err
+		return nil, err
 	}
-
 	// Convert protobuf response back to Go types
-	return UserFromProto(protoResp), nil
+	result := UserFromProto(protoResp)
+	return &result, nil
 }
 // CreateUser calls the gRPC CreateUser method using Go types
-func (c *UserServiceClient) CreateUser(ctx context.Context, req models.CreateUserRequest) (models.CreateUserResponse, error) {
+func (c *UserServiceClient) CreateUser(req *models.User) error {
 	// Convert Go request to protobuf
-	protoReq := CreateUserRequestToProto(req)
+	protoReq := UserToProto(*req)
 
 	// Call gRPC method
-	protoResp, err := c.client.CreateUser(ctx, protoReq)
+	_, err := c.client.CreateUser(context.Background(), protoReq)
 	if err != nil {
-		return models.CreateUserResponse{}, err
+		return err
 	}
-
-	// Convert protobuf response back to Go types
-	return CreateUserResponseFromProto(protoResp), nil
+	return nil
 }

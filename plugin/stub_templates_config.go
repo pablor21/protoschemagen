@@ -242,18 +242,23 @@ func (g *StubGenerator) getImportsForTemplate(templateName string, baseImports [
 	// Add template-specific imports based on what's actually used
 	switch templateName {
 	case "bridge":
-		// Only add context if there are interface services that actually need it
+		// Only add context if there are streaming methods that actually need it
 		needsContext := false
 		for _, service := range g.services {
-			if !service.IsStruct && len(service.Methods) > 0 {
-				needsContext = true
+			for _, method := range service.Methods {
+				if method.IsStreaming {
+					needsContext = true
+					break
+				}
+			}
+			if needsContext {
 				break
 			}
 		}
 		if needsContext {
 			imports["context"] = true
 			if g.ctx != nil && g.ctx.Logger != nil {
-				g.ctx.Logger.Debug(fmt.Sprintf("getImportsForTemplate(%s) - adding context for interface services", templateName))
+				g.ctx.Logger.Debug(fmt.Sprintf("getImportsForTemplate(%s) - adding context for streaming methods", templateName))
 			}
 		}
 		// Bridge doesn't use io, that's for client/adapter streaming
@@ -272,12 +277,55 @@ func (g *StubGenerator) getImportsForTemplate(templateName string, baseImports [
 			}
 		}
 
+		// Check for google.protobuf wrapper types and add necessary imports
+		needsWrappers := false
+		needsEmpty := false
+		for _, service := range g.services {
+			for _, method := range service.Methods {
+				if strings.Contains(method.InputType, "google.protobuf.") {
+					if strings.Contains(method.InputType, "Value") {
+						needsWrappers = true
+					}
+					if strings.Contains(method.InputType, "Empty") {
+						needsEmpty = true
+					}
+				}
+				// For client template, only add emptypb for input types, not output
+				// For other templates, add for output too
+				if templateName != "client" && strings.Contains(method.OutputType, "google.protobuf.") {
+					if strings.Contains(method.OutputType, "Value") {
+						needsWrappers = true
+					}
+					if strings.Contains(method.OutputType, "Empty") {
+						needsEmpty = true
+					}
+				}
+			}
+		}
+		if needsWrappers {
+			imports["google.golang.org/protobuf/types/known/wrapperspb"] = true
+			if g.ctx != nil && g.ctx.Logger != nil {
+				g.ctx.Logger.Debug(fmt.Sprintf("getImportsForTemplate(%s) - adding wrapperspb for wrapper types", templateName))
+			}
+		}
+		if needsEmpty {
+			imports["google.golang.org/protobuf/types/known/emptypb"] = true
+			if g.ctx != nil && g.ctx.Logger != nil {
+				g.ctx.Logger.Debug(fmt.Sprintf("getImportsForTemplate(%s) - adding emptypb for empty types", templateName))
+			}
+		}
+
 		// Add io and log only for streaming methods in adapter/client
 		needsIO := false
+		needsLog := false
 		for _, service := range g.services {
 			for _, method := range service.Methods {
 				if method.IsStreaming {
 					needsIO = true
+					// log is only needed for client template
+					if templateName == "client" {
+						needsLog = true
+					}
 					break
 				}
 			}
@@ -287,9 +335,14 @@ func (g *StubGenerator) getImportsForTemplate(templateName string, baseImports [
 		}
 		if needsIO {
 			imports["io"] = true
+			if g.ctx != nil && g.ctx.Logger != nil {
+				g.ctx.Logger.Debug(fmt.Sprintf("getImportsForTemplate(%s) - adding io for streaming", templateName))
+			}
+		}
+		if needsLog {
 			imports["log"] = true
 			if g.ctx != nil && g.ctx.Logger != nil {
-				g.ctx.Logger.Debug(fmt.Sprintf("getImportsForTemplate(%s) - adding io and log for streaming", templateName))
+				g.ctx.Logger.Debug(fmt.Sprintf("getImportsForTemplate(%s) - adding log for streaming", templateName))
 			}
 		}
 	}
@@ -345,7 +398,7 @@ func (g *StubGenerator) convertToTemplateTypes(types map[string]*TypeInfo) []*Te
 				GoName:              field.GoName,
 				ProtoFieldName:      protoFieldName,
 				ProtoName:           protoName,
-				Type:                field.Type,
+				Type:                g.resolveGenericType(field),
 				ProtoType:           field.ProtoType,
 				Tag:                 field.Tag,
 				IsRepeated:          field.IsRepeated,
@@ -790,6 +843,30 @@ func (g *StubGenerator) extractConcreteTypeFromAlias(aliasName, genericParam str
 	// This is a simplified implementation
 	// In a real-world scenario, we'd need proper AST analysis
 
+	// Find the type info for this alias to get the proper package path
+	if typeInfo, exists := g.originalTypes[aliasName]; exists {
+		var baseType string
+
+		// Common patterns: XxxResponse = Response[Xxx]
+		if strings.HasSuffix(aliasName, "Response") {
+			baseType = strings.TrimSuffix(aliasName, "Response")
+		} else if strings.HasSuffix(aliasName, "Result") {
+			baseType = strings.TrimSuffix(aliasName, "Result")
+		} else if strings.HasSuffix(aliasName, "Edge") {
+			baseType = strings.TrimSuffix(aliasName, "Edge")
+		}
+
+		if baseType != "" {
+			// Return with package qualification for proper template generation
+			packageAlias := typeInfo.Package
+			if lastSlash := strings.LastIndex(packageAlias, "/"); lastSlash != -1 {
+				packageAlias = packageAlias[lastSlash+1:]
+			}
+			return fmt.Sprintf("%s.%s", packageAlias, baseType)
+		}
+	}
+
+	// Fallback to original patterns without package qualification
 	// Common patterns: XxxResponse = Response[Xxx]
 	if strings.HasSuffix(aliasName, "Response") {
 		baseType := strings.TrimSuffix(aliasName, "Response")

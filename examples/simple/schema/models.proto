@@ -11,16 +11,3 @@ message User {
   string email = 3;
 }
 
-message GetUserRequest {
-  int64 id = 1;
-}
-
-message CreateUserRequest {
-  optional User user = 1;
-}
-
-message CreateUserResponse {
-  bool success = 1;
-  string message = 2;
-}
-

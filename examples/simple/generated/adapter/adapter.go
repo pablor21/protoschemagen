@@ -3,8 +3,10 @@
 package adapter
 
 import (
-	"github.com/coso/models"
 	"context"
+	"google.golang.org/protobuf/types/known/wrapperspb"
+	"google.golang.org/protobuf/types/known/emptypb"
+	"github.com/coso/models"
 	pb "github.com/coso/generated/proto/v1"
 )
 
@@ -21,30 +23,29 @@ func NewUserServiceAdapter(service models.UserService) *UserServiceAdapter {
 	}
 }
 // GetUser implements unary RPC
-func (a *UserServiceAdapter) GetUser(ctx context.Context, req *pb.GetUserRequest) (*pb.User, error) {
-	// Convert request
-	goReq := GetUserRequestFromProto(req)
+func (a *UserServiceAdapter) GetUser(ctx context.Context, req *wrapperspb.Int64Value) (*pb.User, error) {
+	// Convert request from protobuf to original Go type
+	goReq := req.Value  // Extract int64 from wrapper
 	
-	// Call service method
-	result, err := a.service.GetUser(ctx, goReq)
+	// Call service method with original signature
+	result, err := a.service.GetUser(goReq)
 	if err != nil {
 		return nil, err
 	}
 	
-	// Convert and return response
-	return UserToProto(result), nil
+	// Convert result to protobuf type
+	return UserToProto(*result), nil
 }
 // CreateUser implements unary RPC
-func (a *UserServiceAdapter) CreateUser(ctx context.Context, req *pb.CreateUserRequest) (*pb.CreateUserResponse, error) {
-	// Convert request
-	goReq := CreateUserRequestFromProto(req)
+func (a *UserServiceAdapter) CreateUser(ctx context.Context, req *pb.User) (*emptypb.Empty, error) {
+	// Convert request from protobuf to original Go type
+	goReqValue := UserFromProto(req)
+	goReq := &goReqValue
 	
-	// Call service method
-	result, err := a.service.CreateUser(ctx, goReq)
+	// Call service method with original signature
+	err := a.service.CreateUser(goReq)
 	if err != nil {
 		return nil, err
 	}
-	
-	// Convert and return response
-	return CreateUserResponseToProto(result), nil
+	return &emptypb.Empty{}, nil
 }

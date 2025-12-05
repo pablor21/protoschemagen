@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"log"
 	"net"
 
@@ -42,21 +41,37 @@ func main() {
 
 type UserServiceImpl struct{}
 
-func (s *UserServiceImpl) GetUser(ctx context.Context, req models.GetUserRequest) (models.User, error) {
+func (s *UserServiceImpl) GetUser(req int64) (*models.User, error) {
 	// Implement your logic to get a user by ID
-	log.Printf("GetUser called with ID: %d", req.ID)
-	return models.User{
-		ID:       req.ID,
+	log.Printf("GetUser called with ID: %d", req)
+	return &models.User{
+		ID:       req,
 		Username: "example_user",
 		Email:    "example@example.com",
 	}, nil
 }
 
-func (s *UserServiceImpl) CreateUser(ctx context.Context, req models.CreateUserRequest) (models.CreateUserResponse, error) {
+func (s *UserServiceImpl) CreateUser(req *models.User) error {
 	// Implement your logic to create a user
-	log.Printf("CreateUser called with user: %+v", req.User)
-	return models.CreateUserResponse{
-		Success: true,
-		Message: "User created successfully",
-	}, nil
+	log.Printf("CreateUser called with user: %+v", req)
+	return nil
 }
+
+// func (s *UserServiceImpl) GetUser(ctx context.Context, req models.GetUserRequest) (models.User, error) {
+// 	// Implement your logic to get a user by ID
+// 	log.Printf("GetUser called with ID: %d", req.ID)
+// 	return models.User{
+// 		ID:       req.ID,
+// 		Username: "example_user",
+// 		Email:    "example@example.com",
+// 	}, nil
+// }
+
+// func (s *UserServiceImpl) CreateUser(ctx context.Context, req models.CreateUserRequest) (models.CreateUserResponse, error) {
+// 	// Implement your logic to create a user
+// 	log.Printf("CreateUser called with user: %+v", req.User)
+// 	return models.CreateUserResponse{
+// 		Success: true,
+// 		Message: "User created successfully",
+// 	}, nil
+// }

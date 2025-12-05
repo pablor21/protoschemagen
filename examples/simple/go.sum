@@ -12,8 +12,6 @@ github.com/pablor21/gonnotation v0.0.5 h1:i5ELEMqkpsqmkNnDN0CrFClfhmOZn4In6iMjWG
 github.com/pablor21/gonnotation v0.0.5/go.mod h1:kc4HjeQbu98FDnOK9PMaTvHZbuprA1A99JuF4l6y9VU=
 github.com/pablor21/goschemagen v0.0.7 h1:S0JrQozw/ClWnYDTzDPqdFU+ZZlQkXwy6tx6YlfhV+g=
 github.com/pablor21/goschemagen v0.0.7/go.mod h1:hCLsH2cQXF+S8410hPVNECue6XsF4/rJnjQWwqVRs28=
-github.com/pablor21/protoschemagen v0.0.3 h1:aeLXJaHhv5spAn8tZ+Lm6UugxshWLixTU5T638y80d0=
-github.com/pablor21/protoschemagen v0.0.3/go.mod h1:VccDqcLXVfMM0ugiiXuhbzecOp6+zSXppbLrhO+14Qg=
 go.opentelemetry.io/auto/sdk v1.2.1 h1:jXsnJ4Lmnqd11kwkBV2LgLoFMZKizbCi5fNZ/ipaZ64=
 go.opentelemetry.io/auto/sdk v1.2.1/go.mod h1:KRTj+aOaElaLi+wW1kO/DZRXwkF4C5xPbEe3ZiIhN7Y=
 go.opentelemetry.io/otel v1.38.0 h1:RkfdswUDRimDg0m2Az18RKOsnI8UDzppJAtj01/Ymk8=

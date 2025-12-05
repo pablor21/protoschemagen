@@ -16,8 +16,8 @@ require (
 )
 
 require (
-	github.com/pablor21/gonnotation v0.0.4 // indirect
-	github.com/pablor21/goschemagen v0.0.3 // indirect
+	github.com/pablor21/gonnotation v0.0.5 // indirect
+	github.com/pablor21/goschemagen v0.0.7 // indirect
 	github.com/pablor21/protoschemagen v0.0.1 // indirect
 	golang.org/x/mod v0.30.0 // indirect
 	golang.org/x/net v0.47.0 // indirect

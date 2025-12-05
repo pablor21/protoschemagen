@@ -67,12 +67,15 @@ type ServiceInfo struct {
 
 // MethodInfo holds information about service methods
 type MethodInfo struct {
-	Name         string
-	InputType    string
-	OutputType   string
-	IsStreaming  bool
-	ClientStream bool
-	ServerStream bool
+	Name               string
+	InputType          string // Protobuf type (e.g., "google.protobuf.Int64Value")
+	OutputType         string // Protobuf type (e.g., "User")
+	OriginalInputType  string // Original Go type (e.g., "int64")
+	OriginalOutputType string // Original Go type (e.g., "*User")
+	IsStreaming        bool
+	ClientStream       bool
+	ServerStream       bool
+	HasContext         bool // Whether original method has context.Context parameter
 }
 
 // NewStubGenerator creates a new stub generator
@@ -270,12 +273,15 @@ func (g *StubGenerator) analyzeOriginalTypes() error {
 		// Convert proto methods to stub methods
 		for _, protoMethod := range protoService.Methods {
 			methodInfo := &MethodInfo{
-				Name:         protoMethod.Name,
-				InputType:    protoMethod.InputType,
-				OutputType:   protoMethod.OutputType,
-				IsStreaming:  false, // TODO: Add streaming support
-				ClientStream: false,
-				ServerStream: false,
+				Name:               protoMethod.Name,
+				InputType:          protoMethod.InputType,
+				OutputType:         protoMethod.OutputType,
+				OriginalInputType:  protoMethod.OriginalInputType,
+				OriginalOutputType: protoMethod.OriginalOutputType,
+				IsStreaming:        protoMethod.IsStreaming,
+				ClientStream:       protoMethod.ClientStream,
+				ServerStream:       protoMethod.ServerStream,
+				HasContext:         protoMethod.HasContext,
 			}
 			serviceInfo.Methods = append(serviceInfo.Methods, methodInfo)
 		}
@@ -880,11 +886,29 @@ func (g *StubGenerator) discoverProtoFiles() ([]string, error) {
 	if g.ctx.CoreConfig.ConfigDir != "" {
 		schemaDir = filepath.Join(g.ctx.CoreConfig.ConfigDir, "schema")
 	}
+
+	// First check direct schema directory for backward compatibility
 	if entries, err := os.ReadDir(schemaDir); err == nil {
 		for _, entry := range entries {
 			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".proto") {
 				protoFiles = append(protoFiles, filepath.Join(schemaDir, entry.Name()))
 			}
+		}
+	}
+
+	// If no direct files found, check schema subdirectories (like schema/proto/)
+	if len(protoFiles) == 0 {
+		err := filepath.WalkDir(schemaDir, func(path string, d os.DirEntry, err error) error {
+			if err != nil {
+				return nil // Skip directories we can't read
+			}
+			if !d.IsDir() && strings.HasSuffix(d.Name(), ".proto") {
+				protoFiles = append(protoFiles, path)
+			}
+			return nil
+		})
+		if err != nil {
+			// If walkdir fails, that's okay, we'll fall back to other discovery methods
 		}
 	}
 

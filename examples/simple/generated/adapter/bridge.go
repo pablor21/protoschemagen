@@ -4,7 +4,6 @@ package adapter
 
 import (
 	"github.com/coso/models"
-	"context"
 )
 // UserServiceBridge implements the adapter interface by directly using the original service
 type UserServiceBridge struct {
@@ -18,10 +17,10 @@ func NewUserServiceBridge(service models.UserService) models.UserService {
 	}
 }
 // GetUser implements the adapter interface by calling the original service
-func (b *UserServiceBridge) GetUser(ctx context.Context, req models.GetUserRequest) (models.User, error) {
-	return b.originalService.GetUser(ctx, req)
+func (b *UserServiceBridge) GetUser(req int64) (*models.User, error) {
+	return b.originalService.GetUser(req)
 }
 // CreateUser implements the adapter interface by calling the original service
-func (b *UserServiceBridge) CreateUser(ctx context.Context, req models.CreateUserRequest) (models.CreateUserResponse, error) {
-	return b.originalService.CreateUser(ctx, req)
+func (b *UserServiceBridge) CreateUser(req *models.User) error {
+	return b.originalService.CreateUser(req)
 }

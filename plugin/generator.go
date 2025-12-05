@@ -14,11 +14,17 @@ import (
 
 // ProtoRPCMethod represents a parsed RPC method
 type ProtoRPCMethod struct {
-	Name       string
-	InputType  string
-	OutputType string
-	Comment    string
-	Original   interface{} // Can be *parser.MethodInfo or *parser.FunctionInfo
+	Name               string
+	InputType          string // Protobuf type (e.g., "google.protobuf.Int64Value")
+	OutputType         string // Protobuf type (e.g., "User")
+	OriginalInputType  string // Original Go type (e.g., "int64")
+	OriginalOutputType string // Original Go type (e.g., "*User")
+	Comment            string
+	ClientStream       bool        // Client streaming
+	ServerStream       bool        // Server streaming
+	IsStreaming        bool        // Any streaming (client or server)
+	HasContext         bool        // Whether original method has context.Context parameter
+	Original           interface{} // Can be *parser.MethodInfo or *parser.FunctionInfo
 }
 
 // ProtoService represents a parsed service
@@ -402,7 +408,13 @@ func (g *Generator) writeImports(out *strings.Builder) error {
 		requiredImports := g.ctx.GetRequiredImports(currentFile, usedTypes)
 
 		for _, importFile := range requiredImports {
-			imports[importFile] = true
+			// Convert full file path to protoc import path
+			// Remove "schema/" prefix since protoc is run with "-I schema"
+			importPath := importFile
+			if len(importFile) > 7 && importFile[:7] == "schema/" {
+				importPath = importFile[7:] // Remove "schema/" prefix
+			}
+			imports[importPath] = true
 		}
 	}
 
@@ -460,6 +472,43 @@ func (g *Generator) writeImports(out *strings.Builder) error {
 				// Check for empty type
 				if strings.Contains(goType, "emptypb") {
 					imports["google/protobuf/empty.proto"] = true
+				}
+			}
+		}
+	}
+
+	// Check services for google.protobuf wrapper types and add necessary imports
+	for _, service := range g.services {
+		for _, method := range service.Methods {
+			// Check input type
+			if strings.Contains(method.InputType, "google.protobuf.") {
+				if strings.Contains(method.InputType, "Value") {
+					imports["google/protobuf/wrappers.proto"] = true
+				}
+				if strings.Contains(method.InputType, "Empty") {
+					imports["google/protobuf/empty.proto"] = true
+				}
+				if strings.Contains(method.InputType, "Timestamp") {
+					imports["google/protobuf/timestamp.proto"] = true
+				}
+				if strings.Contains(method.InputType, "Duration") {
+					imports["google/protobuf/duration.proto"] = true
+				}
+			}
+
+			// Check output type
+			if strings.Contains(method.OutputType, "google.protobuf.") {
+				if strings.Contains(method.OutputType, "Value") {
+					imports["google/protobuf/wrappers.proto"] = true
+				}
+				if strings.Contains(method.OutputType, "Empty") {
+					imports["google/protobuf/empty.proto"] = true
+				}
+				if strings.Contains(method.OutputType, "Timestamp") {
+					imports["google/protobuf/timestamp.proto"] = true
+				}
+				if strings.Contains(method.OutputType, "Duration") {
+					imports["google/protobuf/duration.proto"] = true
 				}
 			}
 		}
@@ -1514,6 +1563,46 @@ func (g *Generator) getGoTypeName(t ast.Expr) string {
 	return "unknown"
 }
 
+// getQualifiedTypeName returns the fully qualified type name with package prefix
+func (g *Generator) getQualifiedTypeName(typeName string) string {
+	// Handle pointer types
+	if strings.HasPrefix(typeName, "*") {
+		baseType := strings.TrimPrefix(typeName, "*")
+		return "*" + g.getQualifiedTypeName(baseType)
+	}
+
+	// Handle slice types
+	if strings.HasPrefix(typeName, "[]") {
+		elementType := strings.TrimPrefix(typeName, "[]")
+		return "[]" + g.getQualifiedTypeName(elementType)
+	}
+
+	// Handle primitive types and error - return as is
+	switch typeName {
+	case "string", "int", "int8", "int16", "int32", "int64",
+		"uint", "uint8", "uint16", "uint32", "uint64",
+		"float32", "float64", "bool", "byte", "rune", "error":
+		return typeName
+	}
+
+	// If already qualified (contains a dot), return as is
+	if strings.Contains(typeName, ".") {
+		return typeName
+	}
+
+	// For user-defined types, look up the package from parsed context
+	if g.ctx != nil && g.ctx.Structs != nil {
+		for _, structInfo := range g.ctx.Structs {
+			if structInfo.Name == typeName {
+				return structInfo.Package + "." + typeName
+			}
+		}
+	}
+
+	// Fallback: assume it's from models package (this is the common case)
+	return "models." + typeName
+}
+
 func (g *Generator) isRepeated(f *parser.FieldInfo) bool {
 	// Check annotation
 	for _, ann := range f.Annotations {
@@ -1796,7 +1885,18 @@ func (g *Generator) generateServiceFromParsedData(out *strings.Builder, service 
 
 	// Generate RPC methods from pre-parsed data
 	for _, method := range service.Methods {
-		fmt.Fprintf(out, "  rpc %s(%s) returns (%s);\n", method.Name, method.InputType, method.OutputType)
+		inputStream := ""
+		outputStream := ""
+
+		if method.ClientStream {
+			inputStream = "stream "
+		}
+		if method.ServerStream {
+			outputStream = "stream "
+		}
+
+		fmt.Fprintf(out, "  rpc %s(%s%s) returns (%s%s);\n",
+			method.Name, inputStream, method.InputType, outputStream, method.OutputType)
 	}
 
 	out.WriteString("}\n\n")
@@ -2295,6 +2395,18 @@ func (g *Generator) parseRPCMethod(method *parser.MethodInfo) ProtoRPCMethod {
 	// Get input/output types from function signature
 	inputType := "google.protobuf.Empty"
 	outputType := "google.protobuf.Empty"
+	originalInputType := ""
+	originalOutputType := ""
+
+	// Check if method has context.Context parameter
+	hasContext := false
+	for _, param := range method.Params {
+		paramType := g.getGoTypeName(param.Type)
+		if paramType == "context.Context" || paramType == "*context.Context" {
+			hasContext = true
+			break
+		}
+	}
 
 	// Find first non-context parameter as input type
 	for _, param := range method.Params {
@@ -2303,7 +2415,8 @@ func (g *Generator) parseRPCMethod(method *parser.MethodInfo) ProtoRPCMethod {
 		if paramType == "context.Context" || paramType == "*context.Context" {
 			continue
 		}
-		inputType = paramType
+		originalInputType = g.getQualifiedTypeName(paramType)
+		inputType = g.wrapPrimitiveType(paramType, method.Name, "Request")
 		break
 	}
 
@@ -2314,17 +2427,106 @@ func (g *Generator) parseRPCMethod(method *parser.MethodInfo) ProtoRPCMethod {
 		if resultType == "error" {
 			continue
 		}
-		outputType = resultType
+		originalOutputType = g.getQualifiedTypeName(resultType)
+		outputType = g.wrapPrimitiveType(resultType, method.Name, "Response")
 		break
 	}
 
-	return ProtoRPCMethod{
-		Name:       method.Name,
-		InputType:  inputType,
-		OutputType: outputType,
-		Comment:    g.getMethodDescription(method),
-		Original:   method,
+	// If no non-error result found but method has results, it's an error-only method
+	if originalOutputType == "" && len(method.Results) > 0 {
+		originalOutputType = "error"
+		outputType = "google.protobuf.Empty"
 	}
+
+	// Check for streaming annotations
+	clientStream := false
+	serverStream := false
+
+	// Look for RPC annotations with streaming parameters
+	for _, ann := range method.Annotations {
+		if strings.ToLower(ann.Name) == "rpc" || strings.HasSuffix(strings.ToLower(ann.Name), ".rpc") {
+			if ann.Params != nil {
+				if clientStreaming, ok := ann.Params["client_streaming"]; ok && clientStreaming == "true" {
+					clientStream = true
+				}
+				if serverStreaming, ok := ann.Params["server_streaming"]; ok && serverStreaming == "true" {
+					serverStream = true
+				}
+			}
+		}
+	}
+
+	// For streaming methods, adjust types to remove slice notation
+	if clientStream || serverStream {
+		// Remove Go slice prefixes for protobuf generation
+		if clientStream && strings.HasPrefix(originalInputType, "[]") {
+			cleanType := strings.TrimPrefix(originalInputType, "[]")
+			// Extract just the type name without package prefix
+			if lastDot := strings.LastIndex(cleanType, "."); lastDot >= 0 {
+				cleanType = cleanType[lastDot+1:]
+			}
+			originalInputType = strings.TrimPrefix(originalInputType, "[]")
+			inputType = g.wrapPrimitiveType(cleanType, method.Name, "Request")
+		}
+		if serverStream && strings.HasPrefix(originalOutputType, "[]") {
+			cleanType := strings.TrimPrefix(originalOutputType, "[]")
+			// Extract just the type name without package prefix
+			if lastDot := strings.LastIndex(cleanType, "."); lastDot >= 0 {
+				cleanType = cleanType[lastDot+1:]
+			}
+			originalOutputType = strings.TrimPrefix(originalOutputType, "[]")
+			outputType = g.wrapPrimitiveType(cleanType, method.Name, "Response")
+		}
+	}
+
+	return ProtoRPCMethod{
+		Name:               method.Name,
+		InputType:          inputType,
+		OutputType:         outputType,
+		OriginalInputType:  originalInputType,
+		OriginalOutputType: originalOutputType,
+		Comment:            g.getMethodDescription(method),
+		ClientStream:       clientStream,
+		ServerStream:       serverStream,
+		IsStreaming:        clientStream || serverStream,
+		HasContext:         hasContext,
+		Original:           method,
+	}
+}
+
+// wrapPrimitiveType wraps primitive types in protobuf wrapper types or generates proper message names
+func (g *Generator) wrapPrimitiveType(goType, methodName, suffix string) string {
+	// Remove pointer prefix
+	cleanType := strings.TrimPrefix(goType, "*")
+
+	// Check if it's a primitive type that needs wrapping
+	switch cleanType {
+	case "int64":
+		return "google.protobuf.Int64Value"
+	case "int32", "int":
+		return "google.protobuf.Int32Value"
+	case "string":
+		return "google.protobuf.StringValue"
+	case "bool":
+		return "google.protobuf.BoolValue"
+	case "float64":
+		return "google.protobuf.DoubleValue"
+	case "float32":
+		return "google.protobuf.FloatValue"
+	case "uint64":
+		return "google.protobuf.UInt64Value"
+	case "uint32", "uint":
+		return "google.protobuf.UInt32Value"
+	case "[]byte":
+		return "google.protobuf.BytesValue"
+	}
+
+	// For complex types, use them as-is (remove pointer prefix for protobuf)
+	if strings.HasPrefix(goType, "*") {
+		return cleanType
+	}
+
+	return goType
 }
 
 // parseRPCMethodFromFunction parses a method from function into ProtoRPCMethod
@@ -2332,6 +2534,18 @@ func (g *Generator) parseRPCMethodFromFunction(fn *parser.FunctionInfo) ProtoRPC
 	// Convert function to method-like structure
 	inputType := "google.protobuf.Empty"
 	outputType := "google.protobuf.Empty"
+	originalInputType := ""
+	originalOutputType := ""
+
+	// Check if function has context.Context parameter
+	hasContext := false
+	for _, param := range fn.Params {
+		paramType := g.getGoTypeName(param.Type)
+		if paramType == "context.Context" || paramType == "*context.Context" {
+			hasContext = true
+			break
+		}
+	}
 
 	// Find first non-context parameter as input type (skip receiver)
 	for _, param := range fn.Params {
@@ -2340,7 +2554,8 @@ func (g *Generator) parseRPCMethodFromFunction(fn *parser.FunctionInfo) ProtoRPC
 		if paramType == "context.Context" || paramType == "*context.Context" {
 			continue
 		}
-		inputType = paramType
+		originalInputType = g.getQualifiedTypeName(paramType)
+		inputType = g.wrapPrimitiveType(paramType, fn.Name, "Request")
 		break
 	}
 
@@ -2351,16 +2566,70 @@ func (g *Generator) parseRPCMethodFromFunction(fn *parser.FunctionInfo) ProtoRPC
 		if resultType == "error" {
 			continue
 		}
-		outputType = resultType
+		originalOutputType = g.getQualifiedTypeName(resultType)
+		outputType = g.wrapPrimitiveType(resultType, fn.Name, "Response")
 		break
 	}
 
+	// If no non-error result found but function has results, it's an error-only function
+	if originalOutputType == "" && len(fn.Results) > 0 {
+		originalOutputType = "error"
+		outputType = "google.protobuf.Empty"
+	}
+
+	// Check for streaming annotations
+	clientStream := false
+	serverStream := false
+
+	// Look for RPC annotations with streaming parameters
+	for _, ann := range fn.Annotations {
+		if strings.ToLower(ann.Name) == "rpc" || strings.HasSuffix(strings.ToLower(ann.Name), ".rpc") {
+			if ann.Params != nil {
+				if clientStreaming, ok := ann.Params["client_streaming"]; ok && clientStreaming == "true" {
+					clientStream = true
+				}
+				if serverStreaming, ok := ann.Params["server_streaming"]; ok && serverStreaming == "true" {
+					serverStream = true
+				}
+			}
+		}
+	}
+
+	// For streaming methods, adjust types to remove slice notation
+	if clientStream || serverStream {
+		// Remove Go slice prefixes for protobuf generation
+		if clientStream && strings.HasPrefix(originalInputType, "[]") {
+			cleanType := strings.TrimPrefix(originalInputType, "[]")
+			// Extract just the type name without package prefix
+			if lastDot := strings.LastIndex(cleanType, "."); lastDot >= 0 {
+				cleanType = cleanType[lastDot+1:]
+			}
+			originalInputType = strings.TrimPrefix(originalInputType, "[]")
+			inputType = g.wrapPrimitiveType(cleanType, fn.Name, "Request")
+		}
+		if serverStream && strings.HasPrefix(originalOutputType, "[]") {
+			cleanType := strings.TrimPrefix(originalOutputType, "[]")
+			// Extract just the type name without package prefix
+			if lastDot := strings.LastIndex(cleanType, "."); lastDot >= 0 {
+				cleanType = cleanType[lastDot+1:]
+			}
+			originalOutputType = strings.TrimPrefix(originalOutputType, "[]")
+			outputType = g.wrapPrimitiveType(cleanType, fn.Name, "Response")
+		}
+	}
+
 	return ProtoRPCMethod{
-		Name:       fn.Name,
-		InputType:  inputType,
-		OutputType: outputType,
-		Comment:    g.getFunctionDescription(fn),
-		Original:   fn,
+		Name:               fn.Name,
+		InputType:          inputType,
+		OutputType:         outputType,
+		OriginalInputType:  originalInputType,
+		OriginalOutputType: originalOutputType,
+		Comment:            g.getFunctionDescription(fn),
+		ClientStream:       clientStream,
+		ServerStream:       serverStream,
+		IsStreaming:        clientStream || serverStream,
+		HasContext:         hasContext,
+		Original:           fn,
 	}
 }
 

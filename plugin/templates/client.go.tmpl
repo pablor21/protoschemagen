@@ -29,18 +29,114 @@ func New{{.Name}}Client(conn *grpc.ClientConn) *{{.Name}}Client {
 {{- range .Methods }}
 {{- if not .IsStreaming }}
 // {{.Name}} calls the gRPC {{.Name}} method using Go types
-func (c *{{$serviceName}}Client) {{.Name}}(ctx context.Context, req models.{{.InputType}}) (models.{{.OutputType}}, error) {
-	// Convert Go request to protobuf
+{{- if eq .OriginalOutputType "error" }}
+func (c *{{$serviceName}}Client) {{.Name}}({{if ne .OriginalInputType ""}}req {{.OriginalInputType}}{{end}}) error {
+{{- else }}
+func (c *{{$serviceName}}Client) {{.Name}}({{if ne .OriginalInputType ""}}req {{.OriginalInputType}}{{end}}) ({{.OriginalOutputType}}, error) {
+{{- end }}
+{{- if eq .InputType "google.protobuf.Empty" }}
+	// Call gRPC method with empty request
+	{{- if eq .OriginalOutputType "error" }}
+	_, err := c.client.{{.Name}}(context.Background(), &emptypb.Empty{})
+	{{- else }}
+	protoResp, err := c.client.{{.Name}}(context.Background(), &emptypb.Empty{})
+	{{- end }}
+{{- else if hasPrefix .InputType "google.protobuf." }}
+	// Convert primitive to wrapper
+{{- if eq .InputType "google.protobuf.Int64Value" }}
+	protoReq := &wrapperspb.Int64Value{Value: req}
+{{- else if eq .InputType "google.protobuf.StringValue" }}
+	protoReq := &wrapperspb.StringValue{Value: req}
+{{- else if eq .InputType "google.protobuf.BoolValue" }}
+	protoReq := &wrapperspb.BoolValue{Value: req}
+{{- else if eq .InputType "google.protobuf.DoubleValue" }}
+	protoReq := &wrapperspb.DoubleValue{Value: req}
+{{- else if eq .InputType "google.protobuf.FloatValue" }}
+	protoReq := &wrapperspb.FloatValue{Value: req}
+{{- else if eq .InputType "google.protobuf.UInt64Value" }}
+	protoReq := &wrapperspb.UInt64Value{Value: req}
+{{- else if eq .InputType "google.protobuf.UInt32Value" }}
+	protoReq := &wrapperspb.UInt32Value{Value: req}
+{{- else if eq .InputType "google.protobuf.Int32Value" }}
+	protoReq := &wrapperspb.Int32Value{Value: req}
+{{- else if eq .InputType "google.protobuf.BytesValue" }}
+	protoReq := &wrapperspb.BytesValue{Value: req}
+{{- else }}
+	{{- if hasPrefix .OriginalInputType "*" }}
+	protoReq := {{.InputType}}ToProto(*req)
+	{{- else }}
 	protoReq := {{.InputType}}ToProto(req)
+	{{- end }}
+{{- end }}
 
 	// Call gRPC method
-	protoResp, err := c.client.{{.Name}}(ctx, protoReq)
+	{{- if eq .OriginalOutputType "error" }}
+	_, err := c.client.{{.Name}}(context.Background(), protoReq)
+	{{- else }}
+	protoResp, err := c.client.{{.Name}}(context.Background(), protoReq)
+	{{- end }}
+{{- else }}
+	// Convert Go request to protobuf
+	{{- if hasPrefix .OriginalInputType "*" }}
+	protoReq := {{.InputType}}ToProto(*req)
+	{{- else }}
+	protoReq := {{.InputType}}ToProto(req)
+	{{- end }}
+
+	// Call gRPC method
+	{{- if eq .OriginalOutputType "error" }}
+	_, err := c.client.{{.Name}}(context.Background(), protoReq)
+	{{- else }}
+	protoResp, err := c.client.{{.Name}}(context.Background(), protoReq)
+	{{- end }}
+{{- end }}
 	if err != nil {
-		return models.{{.OutputType}}{}, err
+{{- if eq .OriginalOutputType "error" }}
+		return err
+{{- else }}
+		return {{zeroValue .OriginalOutputType}}, err
+{{- end }}
 	}
 
-	// Convert protobuf response back to Go types
+{{- if eq .OutputType "google.protobuf.Empty" }}
+	return nil
+{{- else if hasPrefix .OutputType "google.protobuf." }}
+	// Extract value from wrapper
+{{- if eq .OutputType "google.protobuf.Int64Value" }}
+	return protoResp.Value, nil
+{{- else if eq .OutputType "google.protobuf.StringValue" }}
+	return protoResp.Value, nil
+{{- else if eq .OutputType "google.protobuf.BoolValue" }}
+	return protoResp.Value, nil
+{{- else if eq .OutputType "google.protobuf.DoubleValue" }}
+	return protoResp.Value, nil
+{{- else if eq .OutputType "google.protobuf.FloatValue" }}
+	return protoResp.Value, nil
+{{- else if eq .OutputType "google.protobuf.UInt64Value" }}
+	return protoResp.Value, nil
+{{- else if eq .OutputType "google.protobuf.UInt32Value" }}
+	return protoResp.Value, nil
+{{- else if eq .OutputType "google.protobuf.Int32Value" }}
+	return protoResp.Value, nil
+{{- else if eq .OutputType "google.protobuf.BytesValue" }}
+	return protoResp.Value, nil
+{{- else }}
+	{{- if hasPrefix .OriginalOutputType "*" }}
+	result := {{.OutputType}}FromProto(protoResp)
+	return &result, nil
+	{{- else }}
 	return {{.OutputType}}FromProto(protoResp), nil
+	{{- end }}
+{{- end }}
+{{- else }}
+	// Convert protobuf response back to Go types
+	{{- if hasPrefix .OriginalOutputType "*" }}
+	result := {{.OutputType}}FromProto(protoResp)
+	return &result, nil
+	{{- else }}
+	return {{.OutputType}}FromProto(protoResp), nil
+	{{- end }}
+{{- end }}
 }
 {{- else if and (not .ClientStream) .ServerStream }}
 // {{.Name}} calls the gRPC {{.Name}} streaming method
