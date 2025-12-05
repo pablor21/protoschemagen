@@ -898,7 +898,7 @@ func (g *StubGenerator) discoverProtoFiles() ([]string, error) {
 
 	// If no direct files found, check schema subdirectories (like schema/proto/)
 	if len(protoFiles) == 0 {
-		err := filepath.WalkDir(schemaDir, func(path string, d os.DirEntry, err error) error {
+		_ = filepath.WalkDir(schemaDir, func(path string, d os.DirEntry, err error) error {
 			if err != nil {
 				return nil // Skip directories we can't read
 			}
@@ -907,9 +907,9 @@ func (g *StubGenerator) discoverProtoFiles() ([]string, error) {
 			}
 			return nil
 		})
-		if err != nil {
-			// If walkdir fails, that's okay, we'll fall back to other discovery methods
-		}
+		// if err != nil {
+		// 	// If walkdir fails, that's okay, we'll fall back to other discovery methods
+		// }
 	}
 
 	// If still no files found, check config directory for .proto files
